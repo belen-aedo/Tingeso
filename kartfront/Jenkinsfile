@@ -1,0 +1,35 @@
+pipeline {
+    agent any
+    stages {
+        stage("Build Frontend") {
+            steps {
+                checkout scmGit(branches: [[name: '*/main']], 
+                                userRemoteConfigs: [[url: 'https://github.com/belen-aedo/Tingeso']])
+                dir("kartfront") {
+                    bat "npm install"
+                    bat "npm run build"
+                }
+            }
+        }
+        stage("Verify Docker") {
+            steps {
+                script {
+                    bat "docker ps"
+                }
+            }
+        }
+        stage("Build and Push Docker Image") {
+            steps {
+                dir("kartfront") {
+                    script {
+                        withCredentials([usernamePassword(credentialsId: 'docker-credentials', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
+                            bat 'docker login -u "%DOCKER_USERNAME%" -p "%DOCKER_PASSWORD%" https://index.docker.io/v1/'
+                            bat "docker build -t belu10101/karting-front-end ."
+                            bat "docker push belu10101/karting-front-end"
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
