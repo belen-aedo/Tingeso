@@ -1,34 +1,44 @@
-
 pipeline {
     agent any
     tools {
         maven "maven"
+        jdk "jdk21"  // Asegúrate de que "jdk21" está configurado en Global Tool Configuration
     }
     stages {
         stage("Clone Repository") {
             steps {
-                checkout scmGit(branches: [[name: '*/main']],
-                                userRemoteConfigs: [[url: 'https://github.com/belen-aedo/Tingeso']])
+                checkout scmGit(
+                    branches: [[name: '*/main']],
+                    userRemoteConfigs: [[url: 'https://github.com/belen-aedo/Tingeso']]
+                )
             }
         }
 
+        stage("Check Java Version") {
+            steps {
+                bat "java -version"
+            }
+        }
 
         stage("Build JAR File") {
             steps {
                 dir("demo") {
-                    bat "mvn -X clean install"
+                    bat "mvn clean install"
                 }
             }
         }
-
-
 
         stage("Build and Push Docker Image") {
             steps {
                 dir("demo") {
                     script {
-
-                        withCredentials([usernamePassword(credentialsId: 'docker-credentials', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
+                        withCredentials([
+                            usernamePassword(
+                                credentialsId: 'docker-credentials',
+                                usernameVariable: 'DOCKER_USERNAME',
+                                passwordVariable: 'DOCKER_PASSWORD'
+                            )
+                        ]) {
                             bat 'docker login -u "%DOCKER_USERNAME%" -p "%DOCKER_PASSWORD%" https://index.docker.io/v1/'
                             bat "docker build -t belu10101/spring-image ."
                             bat "docker push belu10101/spring-image"
