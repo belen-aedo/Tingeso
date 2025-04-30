@@ -58,6 +58,8 @@ services:
       DB_HOST: mysql-container
       DB_USERNAME: root
       DB_PASSWORD: 20abril2004
+      MAIL_USERNAME: aedope.pbpaa@gmail.com
+      MAIL_PASSWORD: acaccdxzeheulkyt
     networks:
       - backend-network
     depends_on:
@@ -75,6 +77,8 @@ services:
       DB_HOST: mysql-container
       DB_USERNAME: root
       DB_PASSWORD: 20abril2004
+      MAIL_USERNAME: aedope.pbpaa@gmail.com
+      MAIL_PASSWORD: acaccdxzeheulkyt
     networks:
       - backend-network
     depends_on:
@@ -92,6 +96,8 @@ services:
       DB_HOST: mysql-container
       DB_USERNAME: root
       DB_PASSWORD: 20abril2004
+      MAIL_USERNAME: aedope.pbpaa@gmail.com
+      MAIL_PASSWORD: acaccdxzeheulkyt
     networks:
       - backend-network
     depends_on:

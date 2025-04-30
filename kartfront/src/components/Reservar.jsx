@@ -89,7 +89,7 @@ function Reservar() {
         
         <div>
           <input type="text" placeholder="RUT Acompañante" value={acompananteInput} onChange={(e) => setAcompananteInput(e.target.value)} />
-          <button type="button" onClick={agregarAcompanante}>Agregar Acompañante</button>
+          <button type="button" onClick={agregarAcompanante}>Añadir Acompañantes</button>
         </div>
 
         <div>
