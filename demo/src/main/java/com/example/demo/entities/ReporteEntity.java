@@ -34,4 +34,4 @@ public class ReporteEntity {
     private Integer minPersonas;
     private Integer maxPersonas;
 
-}
+    }

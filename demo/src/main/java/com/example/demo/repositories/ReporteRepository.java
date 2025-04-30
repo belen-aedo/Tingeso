@@ -23,4 +23,6 @@ public interface ReporteRepository extends JpaRepository<ReporteEntity, Long> {
 
     @Query("SELECT r FROM ReporteEntity r WHERE r.tipoReporte = 'PorPersonas' AND r.minPersonas <= :personas AND r.maxPersonas >= :personas AND r.mesGenerado = :mesGenerado")
     List<ReporteEntity> findReportesPorRangoPersonasYMes(int personas, LocalDate mesGenerado);
+
+
 }
