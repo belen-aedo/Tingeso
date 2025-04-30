@@ -16,7 +16,7 @@ pipeline {
         stage("Build JAR File") {
             steps {
                 dir("demo") {
-                    bat "mvn clean install"
+                    bat "mvn -X clean install"
                 }
             }
         }
