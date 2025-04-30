@@ -2,7 +2,6 @@ pipeline {
     agent any
     tools {
         maven "maven"
-        jdk "jdk21"  // Asegúrate de que "jdk21" está configurado en Global Tool Configuration
     }
     stages {
         stage("Clone Repository") {
