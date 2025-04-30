@@ -24,4 +24,6 @@ public class ClienteEntity {
     private int visitasMes;
     private LocalDate fechaCumple;
     private int descuentoAplicable;
+
+
 }

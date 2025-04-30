@@ -454,7 +454,7 @@ public class ComprobantePagoService {
                 // Pie del documento
                 contentStream.beginText();
                 contentStream.newLineAtOffset(50, 50);
-                contentStream.showText("Este comprobante debe ser presentado el día de su visita a KartingRM");
+                contentStream.showText("Este comprobante debe ser presentado el día de su visita KartingRM");
                         contentStream.endText();
             }
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
