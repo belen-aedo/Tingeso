@@ -64,7 +64,7 @@ function Clientes() {
         <button onClick={() => navigate('/calendario')}>Pista</button>
       </div>
 
-      <h2>Gestión de Clientes</h2>
+      <h2>Gestión de clientes</h2>
 
       <div>
         <input
