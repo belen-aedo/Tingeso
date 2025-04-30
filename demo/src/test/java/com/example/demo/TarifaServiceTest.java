@@ -106,4 +106,22 @@ class TarifaServiceTest {
         tarifaService.deleteTarifa(1L);
         verify(tarifaRepository).deleteById(1L);
     }
+    @Test
+    void testGetTarifasOrderedByPrecio() {
+        when(tarifaRepository.findAllOrderByPrecioBaseAsc()).thenReturn(List.of(tarifa));
+        List<TarifaEntity> result = tarifaService.getTarifasOrderedByPrecio();
+        assertEquals(1, result.size());
+        assertEquals(12000, result.get(0).getPrecioBase());
+    }
+
+
+    @Test
+    void testGetTarifasByRangoPrecio() {
+        when(tarifaRepository.findByRangoPrecio(10000, 13000)).thenReturn(List.of(tarifa));
+        List<TarifaEntity> result = tarifaService.getTarifasByRangoPrecio(10000, 13000);
+        assertEquals(1, result.size());
+        assertEquals(12000, result.get(0).getPrecioBase());
+    }
+
+
 }

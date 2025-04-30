@@ -80,4 +80,45 @@ class ClienteServiceTest {
         assertEquals(0, cliente.getVisitasMes());
         assertEquals(0, cliente2.getVisitasMes());
     }
+
+    @Test
+    void testGetClienteByEmail() {
+        when(clienteRepository.findByEmail("joaking.alambritox@gmail.com")).thenReturn(Optional.of(cliente));
+        Optional<ClienteEntity> result = clienteService.getClienteByEmail("joaking.alambritox@gmail.com");
+        assertTrue(result.isPresent());
+        assertEquals("joaquin", result.get().getNombre());
+    }
+
+    @Test
+    void testGetClientesByRangoVisitas() {
+        when(clienteRepository.findByVisitasMesBetween(2, 5)).thenReturn(List.of(cliente));
+        List<ClienteEntity> result = clienteService.getClientesByRangoVisitas(2, 5);
+        assertEquals(1, result.size());
+        assertEquals("joaquin", result.get(0).getNombre());
+    }
+
+    @Test
+    void testSaveCliente() {
+        cliente.setVisitasMes(7); // debería aplicar 30%
+        when(clienteRepository.save(cliente)).thenReturn(cliente);
+        ClienteEntity result = clienteService.saveCliente(cliente);
+        assertEquals(30, result.getDescuentoAplicable());
+        verify(clienteRepository).save(cliente);
+    }
+
+    @Test
+    void testDeleteCliente() {
+        clienteService.deleteCliente("20401575-9");
+        verify(clienteRepository).deleteById("20401575-9");
+    }
+
+    @Test
+    void testIncrementarVisitaCliente_NotFound() {
+        when(clienteRepository.findById("20401575-9")).thenReturn(Optional.empty());
+        clienteService.incrementarVisitaCliente("20401575-9");
+        verify(clienteRepository, never()).save(any());
+    }
+
+
+
 }

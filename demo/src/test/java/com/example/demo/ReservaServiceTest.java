@@ -113,4 +113,51 @@ class ReservaServiceTest {
         reservaService.eliminarReserva(1L);
         verify(reservaRepository).deleteById(1L);
     }
+
+    @Test
+    void testObtenerReservasPorCliente() {
+        when(reservaRepository.findByClienteRut("20401575-9")).thenReturn(List.of(reserva));
+        List<ReservaEntity> reservas = reservaService.obtenerReservasPorCliente("20401575-9");
+        assertEquals(1, reservas.size());
+        assertEquals("joaquin", reservas.get(0).getCliente().getNombre());
+    }
+
+
+    @Test
+    void testActualizarReservaNoExiste() {
+        when(reservaRepository.findById(1L)).thenReturn(Optional.empty());
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () ->
+                reservaService.actualizarReserva(1L, reserva)
+        );
+        assertEquals("Reserva no encontrada", ex.getMessage());
+    }
+
+    @Test
+    void testActualizarReservaConClienteNuevoNoEncontrado() {
+        ClienteEntity otroCliente = new ClienteEntity();
+        otroCliente.setRut("99999999-9");
+
+        ReservaEntity actualizada = new ReservaEntity();
+        actualizada.setCliente(otroCliente); // cliente diferente
+
+        when(reservaRepository.findById(1L)).thenReturn(Optional.of(reserva));
+        when(clienteRepository.findById("99999999-9")).thenReturn(Optional.empty());
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () ->
+                reservaService.actualizarReserva(1L, actualizada)
+        );
+        assertEquals("Cliente no encontrado", ex.getMessage());
+    }
+
+    @Test
+    void testObtenerReservasDTO() {
+        when(reservaRepository.findAll()).thenReturn(List.of(reserva));
+        List<ReservaService.ReservaDTO> dtos = reservaService.obtenerReservasDTO();
+        assertEquals(1, dtos.size());
+        assertEquals("Cliente: joaquin", dtos.get(0).title);
+        assertNotNull(dtos.get(0).start);
+        assertNotNull(dtos.get(0).end);
+    }
+
 }
