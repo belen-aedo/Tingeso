@@ -67,7 +67,14 @@ function Carros() {
             className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
           >
             Tarifas
+            </button>
+            <button
+            onClick={() => navigate('/Calendario')}
+            className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
+          >
+            Pista
           </button>
+          
         </div>
       </div>
 

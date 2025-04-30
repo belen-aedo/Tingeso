@@ -74,6 +74,7 @@ function Reservar() {
         <button onClick={() => navigate('/reportes')}>Reportes</button>
        
         <button onClick={() => navigate('/tarifas')}>Tarifas</button>
+        <button onClick={() => navigate('/calendario')}>Pista</button>
       </div>
       
       <h2>Reservas</h2>

@@ -79,6 +79,7 @@ function Tarifas() {
         <button onClick={() => navigate('/comprobantes')}>Comprobante</button>
         <button onClick={() => navigate('/reportes')}>Reportes</button>
         <button onClick={() => navigate('/reservar')}>Reservar</button>
+        <button onClick={() => navigate('/calendario')}>Pista</button>
       </div>
 
       <h2>Gestión de Tarifas</h2>

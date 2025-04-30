@@ -24,6 +24,11 @@ const update = (id, reserva) => {
     return httpClient.put(`/reservas/${id}`, reserva);
 };
 
+const getAllDTO = () => {
+    return httpClient.get("/reservas/dto");
+};
+
+
 const remove = (id) => {
     return httpClient.delete(`/reservas/${id}`);
 };

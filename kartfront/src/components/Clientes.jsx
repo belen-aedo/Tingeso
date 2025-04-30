@@ -61,6 +61,7 @@ function Clientes() {
         <button onClick={() => navigate('/reportes')}>Reportes</button>
         <button onClick={() => navigate('/reservar')}>Reservar</button>
         <button onClick={() => navigate('/tarifas')}>Tarifas</button>
+        <button onClick={() => navigate('/calendario')}>Pista</button>
       </div>
 
       <h2>Gestión de Clientes</h2>

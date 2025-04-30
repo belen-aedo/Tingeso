@@ -6,6 +6,7 @@ import Comprobante from './components/Comprobante.jsx';
 import Reportes from './components/Reportes.jsx';
 import Reservar from './components/Reservar.jsx';
 import Tarifas from './components/Tarifas.jsx';
+import Pista from './components/Calendario.jsx';
 import './App.css';
 
 function App() {
@@ -24,6 +25,7 @@ function App() {
           <Route path="/tarifas" element={<Tarifas />} />
           <Route path="/" element={<Navigate to="/carros" />} />
           <Route path="*" element={<Navigate to="/carros" />} />
+          <Route path="/calendario" element={<Pista />} />
         </Routes>
       </div>
     </Router>
