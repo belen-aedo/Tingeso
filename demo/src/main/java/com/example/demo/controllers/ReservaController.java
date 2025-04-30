@@ -12,9 +12,8 @@ import java.time.LocalDate;
 import java.util.List;
 
 @RestController
-@CrossOrigin("*")
-
 @RequestMapping("/reservas")
+@CrossOrigin("*")
 public class ReservaController {
 
     @Autowired
