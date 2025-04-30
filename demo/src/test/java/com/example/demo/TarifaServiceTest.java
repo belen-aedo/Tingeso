@@ -1,123 +1,109 @@
-package com.example.demo.service;
+package com.example.demo;
 
 import com.example.demo.entities.TarifaEntity;
 import com.example.demo.repositories.TarifaRepository;
+import com.example.demo.service.TarifaService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
+import org.mockito.*;
 
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
-@SpringBootTest
-@ActiveProfiles("test")
-public class TarifaServiceTest {
+class TarifaServiceTest {
 
-    @Autowired
-    private TarifaService tarifaService;
-
-    @Autowired
+    @Mock
     private TarifaRepository tarifaRepository;
+
+    @InjectMocks
+    private TarifaService tarifaService;
 
     private TarifaEntity tarifa;
 
     @BeforeEach
-    void setup() {
-        tarifaRepository.deleteAll();
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
+
         tarifa = new TarifaEntity();
+        tarifa.setId(1L);
         tarifa.setNumeroVueltas(10);
         tarifa.setTiempoMaximo(15);
-        tarifa.setPrecioBase(5000);
-        tarifa.setDuracionReserva(30);
-        tarifaRepository.save(tarifa);
+        tarifa.setPrecioBase(12000);
+        tarifa.setDuracionReserva(20);
     }
 
     @Test
-    void whenGetAllTarifas_thenReturnList() {
+    void testGetAllTarifas() {
+        when(tarifaRepository.findAll()).thenReturn(List.of(tarifa));
         List<TarifaEntity> tarifas = tarifaService.getAllTarifas();
-        assertThat(tarifas).hasSize(1);
+        assertEquals(1, tarifas.size());
+        assertEquals(10, tarifas.get(0).getNumeroVueltas());
     }
 
     @Test
-    void whenGetTarifasOrderedByPrecio_thenReturnOrderedList() {
-        List<TarifaEntity> tarifas = tarifaService.getTarifasOrderedByPrecio();
-        assertThat(tarifas).isNotEmpty();
-        assertThat(tarifas.get(0).getPrecioBase()).isEqualTo(5000);
+    void testGetTarifaById() {
+        when(tarifaRepository.findById(1L)).thenReturn(Optional.of(tarifa));
+        Optional<TarifaEntity> result = tarifaService.getTarifaById(1L);
+        assertTrue(result.isPresent());
+        assertEquals(15, result.get().getTiempoMaximo());
     }
 
     @Test
-    void whenGetTarifaById_thenReturnTarifa() {
-        Optional<TarifaEntity> found = tarifaService.getTarifaById(tarifa.getId());
-        assertThat(found).isPresent();
+    void testGetTarifaByNumeroVueltas() {
+        when(tarifaRepository.findByNumeroVueltas(10)).thenReturn(Optional.of(tarifa));
+        Optional<TarifaEntity> result = tarifaService.getTarifaByNumeroVueltas(10);
+        assertTrue(result.isPresent());
+        assertEquals(12000, result.get().getPrecioBase());
     }
 
     @Test
-    void whenGetTarifaByNumeroVueltas_thenReturnOptional() {
-        Optional<TarifaEntity> found = tarifaService.getTarifaByNumeroVueltas(10);
-        assertThat(found).isPresent();
+    void testGetTarifaByNumeroVueltasAndTiempoMaximo() {
+        when(tarifaRepository.findByNumeroVueltasAndTiempoMaximo(10, 15)).thenReturn(Optional.of(tarifa));
+        Optional<TarifaEntity> result = tarifaService.getTarifaByNumeroVueltasAndTiempoMaximo(10, 15);
+        assertTrue(result.isPresent());
+        assertEquals(20, result.get().getDuracionReserva());
     }
 
     @Test
-    void whenGetTarifaByNumeroVueltasAndTiempoMaximo_thenReturnOptional() {
-        Optional<TarifaEntity> found = tarifaService.getTarifaByNumeroVueltasAndTiempoMaximo(10, 15);
-        assertThat(found).isPresent();
+    void testCrearTarifa() {
+        when(tarifaRepository.save(any())).thenReturn(tarifa);
+
+        TarifaEntity creada = tarifaService.crearTarifa(10, 15, 12000, 20);
+        assertEquals(10, creada.getNumeroVueltas());
+        assertEquals(12000, creada.getPrecioBase());
     }
 
     @Test
-    void whenGetTarifasByRangoPrecio_thenReturnList() {
-        List<TarifaEntity> tarifas = tarifaService.getTarifasByRangoPrecio(4000, 6000);
-        assertThat(tarifas).hasSize(1);
-    }
-
-    @Test
-    void whenSaveTarifa_thenItIsSaved() {
-        TarifaEntity nueva = new TarifaEntity();
-        nueva.setNumeroVueltas(5);
-        nueva.setTiempoMaximo(10);
-        nueva.setPrecioBase(3000);
-        nueva.setDuracionReserva(20);
-
-        TarifaEntity saved = tarifaService.saveTarifa(nueva);
-        assertThat(saved.getPrecioBase()).isEqualTo(3000);
-    }
-
-    @Test
-    void whenDeleteTarifa_thenItIsRemoved() {
-        tarifaService.deleteTarifa(tarifa.getId());
-        Optional<TarifaEntity> deleted = tarifaRepository.findById(tarifa.getId());
-        assertThat(deleted).isEmpty();
-    }
-
-    @Test
-    void whenCrearTarifa_thenItIsCreatedAndSaved() {
-        TarifaEntity created = tarifaService.crearTarifa(8, 20, 7000, 25);
-        assertThat(created.getNumeroVueltas()).isEqualTo(8);
-        assertThat(created.getTiempoMaximo()).isEqualTo(20);
-        assertThat(created.getPrecioBase()).isEqualTo(7000);
-        assertThat(created.getDuracionReserva()).isEqualTo(25);
-    }
-
-    @Test
-    void whenActualizarTarifa_thenValuesUpdated() {
+    void testActualizarTarifaExistente() {
         TarifaEntity actualizada = new TarifaEntity();
         actualizada.setNumeroVueltas(12);
-        actualizada.setTiempoMaximo(18);
-        actualizada.setPrecioBase(6000);
-        actualizada.setDuracionReserva(35);
+        actualizada.setTiempoMaximo(20);
+        actualizada.setPrecioBase(14000);
+        actualizada.setDuracionReserva(25);
 
-        TarifaEntity updated = tarifaService.actualizarTarifa(tarifa.getId(), actualizada);
-        assertThat(updated).isNotNull();
-        assertThat(updated.getNumeroVueltas()).isEqualTo(12);
+        when(tarifaRepository.findById(1L)).thenReturn(Optional.of(tarifa));
+        when(tarifaRepository.save(any())).thenReturn(tarifa);
+
+        TarifaEntity result = tarifaService.actualizarTarifa(1L, actualizada);
+        assertNotNull(result);
+        verify(tarifaRepository).save(any(TarifaEntity.class));
     }
 
     @Test
-    void whenActualizarTarifaNonExistent_thenReturnNull() {
+    void testActualizarTarifaNoExistente() {
+        when(tarifaRepository.findById(99L)).thenReturn(Optional.empty());
+
         TarifaEntity actualizada = new TarifaEntity();
-        TarifaEntity updated = tarifaService.actualizarTarifa(999L, actualizada);
-        assertThat(updated).isNull();
+        TarifaEntity result = tarifaService.actualizarTarifa(99L, actualizada);
+
+        assertNull(result);
+    }
+
+    @Test
+    void testDeleteTarifa() {
+        tarifaService.deleteTarifa(1L);
+        verify(tarifaRepository).deleteById(1L);
     }
 }

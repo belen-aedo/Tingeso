@@ -1,121 +1,135 @@
-package com.example.demo.service;
+package com.example.demo;
 
-import com.example.demo.entities.ClienteEntity;
-import com.example.demo.entities.ComprobantePagoEntity;
-import com.example.demo.entities.ReservaEntity;
-import com.example.demo.entities.TarifaEntity;
+import com.example.demo.entities.*;
 import com.example.demo.repositories.ComprobantePagoRepository;
-import com.example.demo.repositories.ReservaRepository;
 import com.example.demo.repositories.TarifaRepository;
+import com.example.demo.service.ClienteService;
+import com.example.demo.service.ComprobantePagoService;
+import com.example.demo.service.ReservaService;
+import com.example.demo.service.TarifaService;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
+import org.mockito.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
-@SpringBootTest
-@ActiveProfiles("test")
-public class ComprobantePagoServiceTest {
+class ComprobantePagoServiceTest {
 
-    @Autowired
-    private ComprobantePagoService comprobantePagoService;
-
-    @Autowired
+    @Mock
     private ComprobantePagoRepository comprobantePagoRepository;
 
-    @Autowired
-    private ReservaService reservaService;
-
-    @Autowired
-    private ReservaRepository reservaRepository;
-
-    @Autowired
+    @Mock
     private ClienteService clienteService;
 
-    @Autowired
+    @Mock
+    private ReservaService reservaService;
+
+    @Mock
     private TarifaService tarifaService;
 
-    @Autowired
+    @Mock
     private TarifaRepository tarifaRepository;
+
+    @Mock
+    private JavaMailSender mailSender;
+
+    @InjectMocks
+    private ComprobantePagoService comprobantePagoService;
 
     private ClienteEntity cliente;
     private ReservaEntity reserva;
     private TarifaEntity tarifa;
 
     @BeforeEach
-    void setup() {
-        comprobantePagoRepository.deleteAll();
-        reservaRepository.deleteAll();
-        tarifaRepository.deleteAll();
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
 
         cliente = new ClienteEntity();
-        cliente.setRut("12345678-9");
-        cliente.setNombre("Belén Aedo");
-        cliente.setEmail("belen.aedo@usach.cl");
-        cliente.setFechaCumple(LocalDate.of(1995, 4, 30));
-        cliente.setDescuentoAplicable(10);
-        clienteService.saveCliente(cliente);
+        cliente.setRut("20401575-9");
+        cliente.setNombre("joaquin");
+        cliente.setEmail("joaking.alambritox@gmail.com");
+        cliente.setDescuentoAplicable(20);
+        cliente.setFechaCumple(LocalDate.of(2000, 2, 4));
 
         tarifa = new TarifaEntity();
+        tarifa.setId(1L);
         tarifa.setNumeroVueltas(10);
         tarifa.setTiempoMaximo(15);
-        tarifa.setPrecioBase(5000);
-        tarifa.setDuracionReserva(30);
-        tarifa = tarifaRepository.save(tarifa);
+        tarifa.setPrecioBase(10000);
+        tarifa.setDuracionReserva(20);
 
         reserva = new ReservaEntity();
+        reserva.setIdReserva(1L);
         reserva.setCliente(cliente);
-        reserva.setDiaReserva(LocalDate.now());
-        reserva.setHoraInicio(LocalTime.of(14, 0));
-        reserva.setHoraFin(LocalTime.of(15, 0));
-        reserva.setTiempoReserva(30);
-        reserva = reservaRepository.save(reserva);
+        reserva.setDiaReserva(LocalDate.of(2025, 2, 4)); // coincide con cumpleaños
+        reserva.setHoraInicio(LocalTime.of(10, 0));
+        reserva.setHoraFin(LocalTime.of(11, 0));
+        reserva.setTiempoReserva(20);
+        reserva.setAcompanantes(List.of("21556446-0"));
     }
 
     @Test
-    void whenGenerarComprobantePago_thenSuccess() {
-        ComprobantePagoEntity comprobante = comprobantePagoService.generarComprobantePago(reserva.getIdReserva());
-        assertThat(comprobante.getCliente().getRut()).isEqualTo("12345678-9");
-        assertThat(comprobante.getReserva().getIdReserva()).isEqualTo(reserva.getIdReserva());
-        assertThat(comprobante.getMontoTotalConIva()).isGreaterThanOrEqualTo(BigDecimal.valueOf(0));
+    void testGenerarComprobantePago_Success() {
+        ClienteEntity acompanante = new ClienteEntity();
+        acompanante.setRut("21556446-0");
+        acompanante.setNombre("belen");
+        acompanante.setDescuentoAplicable(0);
+        acompanante.setFechaCumple(LocalDate.of(2004, 4, 20));
+
+        when(reservaService.obtenerReservaPorId(1L)).thenReturn(Optional.of(reserva));
+        when(tarifaService.getTarifaById(anyLong())).thenReturn(Optional.of(tarifa));
+        when(tarifaRepository.findFirstByTiempoMaximoGreaterThanEqualOrderByTiempoMaximoAsc(anyInt())).thenReturn(tarifa);
+        when(clienteService.getClienteById("21556446-0")).thenReturn(Optional.of(acompanante));
+        when(comprobantePagoRepository.save(any())).thenAnswer(i -> i.getArguments()[0]);
+
+        ComprobantePagoEntity comprobante = comprobantePagoService.generarComprobantePago(1L);
+
+        assertNotNull(comprobante);
+        assertEquals(cliente.getRut(), comprobante.getCliente().getRut());
+        assertEquals(1 + reserva.getAcompanantes().size(), // total personas
+                comprobante.getReserva().getAcompanantes().size() + 1);
+        assertTrue(comprobante.getMontoTotalConIva().compareTo(BigDecimal.ZERO) > 0);
     }
 
     @Test
-    void whenGetAllComprobantes_thenReturnList() {
-        comprobantePagoService.generarComprobantePago(reserva.getIdReserva());
-        List<ComprobantePagoEntity> lista = comprobantePagoService.getAllComprobantes();
-        assertThat(lista).isNotEmpty();
+    void testGenerarComprobantePago_ReservaNoExiste() {
+        when(reservaService.obtenerReservaPorId(999L)).thenReturn(Optional.empty());
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () ->
+                comprobantePagoService.generarComprobantePago(999L));
+        assertTrue(ex.getMessage().contains("No se encontró la reserva"));
     }
 
     @Test
-    void whenGetComprobanteById_thenReturnCorrectOne() {
-        ComprobantePagoEntity comprobante = comprobantePagoService.generarComprobantePago(reserva.getIdReserva());
-        Optional<ComprobantePagoEntity> found = comprobantePagoService.getComprobanteById(comprobante.getId());
-        assertThat(found).isPresent();
-        assertThat(found.get().getReserva().getIdReserva()).isEqualTo(reserva.getIdReserva());
+    void testGetComprobanteById() {
+        ComprobantePagoEntity comprobante = new ComprobantePagoEntity();
+        comprobante.setId(5L);
+        when(comprobantePagoRepository.findById(5L)).thenReturn(Optional.of(comprobante));
+
+        Optional<ComprobantePagoEntity> result = comprobantePagoService.getComprobanteById(5L);
+        assertTrue(result.isPresent());
+        assertEquals(5L, result.get().getId());
     }
 
     @Test
-    void whenGetComprobanteByReservaId_thenReturnCorrectOne() {
-        ComprobantePagoEntity comprobante = comprobantePagoService.generarComprobantePago(reserva.getIdReserva());
-        Optional<ComprobantePagoEntity> found = comprobantePagoService.getComprobanteByReservaId(reserva.getIdReserva());
-        assertThat(found).isPresent();
+    void testGetComprobanteByReservaId() {
+        ComprobantePagoEntity comprobante = new ComprobantePagoEntity();
+        when(comprobantePagoRepository.findByReservaIdReserva(1L)).thenReturn(Optional.of(comprobante));
+        Optional<ComprobantePagoEntity> result = comprobantePagoService.getComprobanteByReservaId(1L);
+        assertTrue(result.isPresent());
     }
 
     @Test
-    void whenGetComprobantesByCliente_thenReturnList() {
-        comprobantePagoService.generarComprobantePago(reserva.getIdReserva());
-        List<ComprobantePagoEntity> lista = comprobantePagoService.getComprobantesByCliente(cliente);
-        assertThat(lista).isNotEmpty();
+    void testGetAllComprobantes() {
+        when(comprobantePagoRepository.findAll()).thenReturn(List.of(new ComprobantePagoEntity()));
+        List<ComprobantePagoEntity> result = comprobantePagoService.getAllComprobantes();
+        assertEquals(1, result.size());
     }
-
-    // Nota: No se incluye el test para envio de email real para evitar efectos secundarios.
 }

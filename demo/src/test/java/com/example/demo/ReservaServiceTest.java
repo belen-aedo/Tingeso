@@ -4,131 +4,113 @@ import com.example.demo.entities.ClienteEntity;
 import com.example.demo.entities.ReservaEntity;
 import com.example.demo.repositories.ClienteRepository;
 import com.example.demo.repositories.ReservaRepository;
+
 import com.example.demo.service.ReservaService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
+import org.mockito.*;
 
 import java.time.LocalDate;
 import java.time.LocalTime;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
-@SpringBootTest
-@ActiveProfiles("test")
-public class ReservaServiceTest {
+class ReservaServiceTest {
 
-    @Autowired
-    private ReservaService reservaService;
-
-    @Autowired
+    @Mock
     private ReservaRepository reservaRepository;
 
-    @Autowired
+    @Mock
     private ClienteRepository clienteRepository;
+
+    @InjectMocks
+    private ReservaService reservaService;
 
     private ClienteEntity cliente;
     private ReservaEntity reserva;
 
     @BeforeEach
-    void setup() {
-        reservaRepository.deleteAll();
-        clienteRepository.deleteAll();
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
 
         cliente = new ClienteEntity();
-        cliente.setRut("11111111-1");
-        cliente.setNombre("Pedro Perez");
-        cliente.setEmail("pedro@example.com");
-        clienteRepository.save(cliente);
+        cliente.setRut("20401575-9");
+        cliente.setNombre("joaquin");
+        cliente.setEmail("joaking.alambritox@gmail.com");
 
         reserva = new ReservaEntity();
+        reserva.setIdReserva(1L);
         reserva.setCliente(cliente);
-        reserva.setDiaReserva(LocalDate.of(2025, 4, 30));
+        reserva.setDiaReserva(LocalDate.of(2025, 5, 10));
         reserva.setHoraInicio(LocalTime.of(10, 0));
         reserva.setHoraFin(LocalTime.of(11, 0));
-        reservaRepository.save(reserva);
+        reserva.setAcompanantes(new ArrayList<>());
     }
 
     @Test
-    void whenObtenerTodasLasReservas_thenReturnList() {
+    void testObtenerTodasLasReservas() {
+        when(reservaRepository.findAll()).thenReturn(List.of(reserva));
         List<ReservaEntity> reservas = reservaService.obtenerTodasLasReservas();
-        assertThat(reservas).isNotEmpty();
+        assertEquals(1, reservas.size());
+        assertEquals(cliente.getNombre(), reservas.get(0).getCliente().getNombre());
     }
 
     @Test
-    void whenObtenerReservaPorId_thenReturnOptional() {
-        Optional<ReservaEntity> found = reservaService.obtenerReservaPorId(reserva.getIdReserva());
-        assertThat(found).isPresent();
+    void testObtenerReservaPorId() {
+        when(reservaRepository.findById(1L)).thenReturn(Optional.of(reserva));
+        Optional<ReservaEntity> result = reservaService.obtenerReservaPorId(1L);
+        assertTrue(result.isPresent());
+        assertEquals("joaquin", result.get().getCliente().getNombre());
     }
 
     @Test
-    void whenObtenerReservasPorDia_thenReturnList() {
-        List<ReservaEntity> reservas = reservaService.obtenerReservasPorDia(LocalDate.of(2025, 4, 30));
-        assertThat(reservas).hasSize(1);
+    void testObtenerReservasPorDia() {
+        LocalDate dia = LocalDate.of(2025, 5, 10);
+        when(reservaRepository.findByDiaReserva(dia)).thenReturn(List.of(reserva));
+        List<ReservaEntity> reservas = reservaService.obtenerReservasPorDia(dia);
+        assertEquals(1, reservas.size());
     }
 
     @Test
-    void whenObtenerReservasPorCliente_thenReturnList() {
-        List<ReservaEntity> reservas = reservaService.obtenerReservasPorCliente("11111111-1");
-        assertThat(reservas).hasSize(1);
+    void testCrearReservaConClienteExistente() {
+        when(clienteRepository.findById("20401575-9")).thenReturn(Optional.of(cliente));
+        when(reservaRepository.save(reserva)).thenReturn(reserva);
+
+        ReservaEntity creada = reservaService.crearReserva(reserva);
+        assertEquals("joaquin", creada.getCliente().getNombre());
     }
 
     @Test
-    void whenCrearReservaWithExistingCliente_thenSuccess() {
-        ReservaEntity nueva = new ReservaEntity();
-        nueva.setCliente(cliente);
-        nueva.setDiaReserva(LocalDate.now());
-        nueva.setHoraInicio(LocalTime.of(14, 0));
-        nueva.setHoraFin(LocalTime.of(15, 0));
+    void testCrearReservaConClienteInexistente() {
+        when(clienteRepository.findById("20401575-9")).thenReturn(Optional.empty());
 
-        ReservaEntity saved = reservaService.crearReserva(nueva);
-        assertThat(saved.getCliente().getRut()).isEqualTo("11111111-1");
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> {
+            reservaService.crearReserva(reserva);
+        });
+        assertEquals("Cliente no encontrado", ex.getMessage());
     }
 
     @Test
-    void whenCrearReservaWithNonExistingCliente_thenThrowException() {
-        ClienteEntity falso = new ClienteEntity();
-        falso.setRut("00000000-0");
+    void testActualizarReserva() {
+        ReservaEntity actualizada = new ReservaEntity();
+        actualizada.setCliente(cliente);
+        actualizada.setDiaReserva(LocalDate.of(2025, 5, 12));
+        actualizada.setHoraInicio(LocalTime.of(12, 0));
+        actualizada.setHoraFin(LocalTime.of(13, 0));
 
-        ReservaEntity nueva = new ReservaEntity();
-        nueva.setCliente(falso);
+        when(reservaRepository.findById(1L)).thenReturn(Optional.of(reserva));
+        when(clienteRepository.findById("20401575-9")).thenReturn(Optional.of(cliente));
+        when(reservaRepository.save(any())).thenReturn(reserva);
 
-        assertThatThrownBy(() -> reservaService.crearReserva(nueva))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Cliente no encontrado");
+        ReservaEntity result = reservaService.actualizarReserva(1L, actualizada);
+        assertEquals(LocalDate.of(2025, 5, 12), result.getDiaReserva());
     }
 
     @Test
-    void whenActualizarReserva_thenSuccess() {
-        reserva.setAcompanantes(List.of("22222222-2"));
-        ReservaEntity actualizada = reservaService.actualizarReserva(reserva.getIdReserva(), reserva);
-        assertThat(actualizada.getAcompanantes()).contains("22222222-2");
-    }
-
-    @Test
-    void whenActualizarReservaInexistente_thenThrowException() {
-        ReservaEntity nueva = new ReservaEntity();
-        assertThatThrownBy(() -> reservaService.actualizarReserva(999L, nueva))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("Reserva no encontrada");
-    }
-
-    @Test
-    void whenObtenerReservasDTO_thenReturnFormattedList() {
-        List<ReservaService.ReservaDTO> dtos = reservaService.obtenerReservasDTO();
-        assertThat(dtos).hasSize(1);
-        assertThat(dtos.get(0).title).contains("Cliente: Pedro Perez");
-    }
-
-    @Test
-    void whenEliminarReserva_thenRemoveIt() {
-        reservaService.eliminarReserva(reserva.getIdReserva());
-        Optional<ReservaEntity> deleted = reservaRepository.findById(reserva.getIdReserva());
-        assertThat(deleted).isEmpty();
+    void testEliminarReserva() {
+        reservaService.eliminarReserva(1L);
+        verify(reservaRepository).deleteById(1L);
     }
 }

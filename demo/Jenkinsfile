@@ -16,18 +16,12 @@ pipeline {
         stage("Build JAR File") {
             steps {
                 dir("demo") {
-                    bat "mvn clean package"
+                    bat "mvn clean install"
                 }
             }
         }
 
-        stage("Test") {
-            steps {
-                dir("demo") {
-                    bat "mvn test"
-                }
-            }
-        }
+
 
         stage("Build and Push Docker Image") {
             steps {

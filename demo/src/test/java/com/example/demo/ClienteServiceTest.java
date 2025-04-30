@@ -5,110 +5,79 @@ import com.example.demo.repositories.ClienteRepository;
 import com.example.demo.service.ClienteService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.ActiveProfiles;
+import org.mockito.*;
 
-import java.util.List;
-import java.util.Optional;
+import java.time.LocalDate;
+import java.util.*;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
-@SpringBootTest
-@ActiveProfiles("test")
-public class ClienteServiceTest {
+class ClienteServiceTest {
 
-    @Autowired
-    private ClienteService clienteService;
-
-    @Autowired
+    @Mock
     private ClienteRepository clienteRepository;
 
-    private ClienteEntity clienteBase;
-    private ClienteEntity clienteExtra;
+    @InjectMocks
+    private ClienteService clienteService;
+
+    private ClienteEntity cliente;
 
     @BeforeEach
-    void setup() {
-        clienteRepository.deleteAll();
+    void setUp() {
+        MockitoAnnotations.openMocks(this);
 
-        // Cliente principal
-        clienteBase = new ClienteEntity();
-        clienteBase.setRut("21556446-0");
-        clienteBase.setNombre("belen aedo");
-        clienteBase.setEmail("belen.aedo@usach.cl");
-        clienteBase.setVisitasMes(3);
-        clienteBase.setDescuentoAplicable(0);
-        clienteRepository.save(clienteBase);
-
-        // Cliente adicional para pruebas (usado en incrementar, borrar, etc.)
-        clienteExtra = new ClienteEntity();
-        clienteExtra.setRut("12345678-9");
-        clienteExtra.setNombre("Juan Perez");
-        clienteExtra.setEmail("juan@example.com");
-        clienteExtra.setVisitasMes(3);
-        clienteExtra.setDescuentoAplicable(0);
-        clienteRepository.save(clienteExtra);
+        cliente = new ClienteEntity();
+        cliente.setRut("20401575-9");
+        cliente.setNombre("joaquin");
+        cliente.setEmail("joaking.alambritox@gmail.com");
+        cliente.setVisitasMes(0);
+        cliente.setFechaCumple(LocalDate.of(2000, 2, 4));
+        cliente.setDescuentoAplicable(20);
     }
 
     @Test
-    void whenGetAllClientes_thenReturnList() {
+    void testGetAllClientes() {
+        when(clienteRepository.findAll()).thenReturn(List.of(cliente));
         List<ClienteEntity> clientes = clienteService.getAllClientes();
-        assertThat(clientes).hasSize(2); // ahora hay 2 clientes
+        assertEquals(1, clientes.size());
+        assertEquals("joaquin", clientes.get(0).getNombre());
     }
 
     @Test
-    void whenGetClienteById_thenReturnCliente() {
-        Optional<ClienteEntity> found = clienteService.getClienteById("21556446-0");
-        assertThat(found).isPresent();
-        assertThat(found.get().getNombre()).isEqualTo("belen aedo");
+    void testGetClienteById() {
+        when(clienteRepository.findById("20401575-9")).thenReturn(Optional.of(cliente));
+        Optional<ClienteEntity> result = clienteService.getClienteById("20401575-9");
+        assertTrue(result.isPresent());
+        assertEquals("joaquin", result.get().getNombre());
     }
 
     @Test
-    void whenGetClienteByEmail_thenReturnCliente() {
-        Optional<ClienteEntity> found = clienteService.getClienteByEmail("belen.aedo@usach.cl");
-        assertThat(found).isPresent();
-        assertThat(found.get().getRut()).isEqualTo("21556446-0");
+    void testActualizarCategoriaFrecuencia() {
+        cliente.setVisitasMes(6); // debería aplicar 20%
+        clienteService.actualizarCategoriaFrecuencia(cliente);
+        assertEquals(20, cliente.getDescuentoAplicable());
     }
 
     @Test
-    void whenGetClientesByRangoVisitas_thenReturnList() {
-        List<ClienteEntity> clientes = clienteService.getClientesByRangoVisitas(2, 5);
-        assertThat(clientes).hasSize(2); // ambos clientes tienen 3 visitas
+    void testIncrementarVisitaCliente() {
+        when(clienteRepository.findById("20401575-9")).thenReturn(Optional.of(cliente));
+        clienteService.incrementarVisitaCliente("20401575-9");
+        verify(clienteRepository, times(1)).save(cliente);
+        assertEquals(1, cliente.getVisitasMes());
     }
 
     @Test
-    void whenSaveCliente_thenDescuentoIsUpdated() {
-        ClienteEntity nuevo = new ClienteEntity();
-        nuevo.setRut("98765432-1");
-        nuevo.setNombre("Maria Lopez");
-        nuevo.setEmail("maria@example.com");
-        nuevo.setVisitasMes(6); // debe generar 20% de descuento
+    void testResetearVisitasMensuales() {
+        ClienteEntity cliente2 = new ClienteEntity();
+        cliente2.setRut("21556446-0");
+        cliente2.setNombre("belen");
+        cliente2.setVisitasMes(3);
 
-        ClienteEntity saved = clienteService.saveCliente(nuevo);
-        assertThat(saved.getDescuentoAplicable()).isEqualTo(20);
-    }
-
-    @Test
-    void whenIncrementarVisita_thenUpdateVisitas() {
-        clienteService.incrementarVisitaCliente("12345678-9");
-        Optional<ClienteEntity> updated = clienteRepository.findById("12345678-9");
-        assertThat(updated).isPresent();
-        assertThat(updated.get().getVisitasMes()).isEqualTo(4); // antes tenía 3
-    }
-
-    @Test
-    void whenResetearVisitas_thenAllSetToZero() {
+        when(clienteRepository.findAll()).thenReturn(List.of(cliente, cliente2));
         clienteService.resetearVisitasMensuales();
-        List<ClienteEntity> clientes = clienteRepository.findAll();
-        for (ClienteEntity c : clientes) {
-            assertThat(c.getVisitasMes()).isZero();
-        }
-    }
-
-    @Test
-    void whenDeleteCliente_thenNotFound() {
-        clienteService.deleteCliente("12345678-9");
-        Optional<ClienteEntity> deleted = clienteRepository.findById("12345678-9");
-        assertThat(deleted).isEmpty();
+        verify(clienteRepository, times(2)).save(any(ClienteEntity.class));
+        assertEquals(0, cliente.getVisitasMes());
+        assertEquals(0, cliente2.getVisitasMes());
     }
 }

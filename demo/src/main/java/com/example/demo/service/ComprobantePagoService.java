@@ -34,7 +34,7 @@ import java.util.Optional;
 @Service
 public class ComprobantePagoService {
 
-    // Agregar este método getter al final de la clase ComprobantePagoService
+    private static final BigDecimal IVA_RATE = BigDecimal.valueOf(0);
     @Getter
     private final ComprobantePagoRepository comprobantePagoRepository;
     private final ClienteService clienteService;
@@ -43,7 +43,8 @@ public class ComprobantePagoService {
     private final TarifaRepository tarifaRepository;
     private final JavaMailSender mailSender;
 
-    private static final BigDecimal IVA_RATE = new BigDecimal("0.19");
+    @Autowired
+    private ReporteService reporteService; // ✅ CAMPO CORRECTAMENTE INYECTADO
 
     @Autowired
     public ComprobantePagoService(
@@ -271,8 +272,9 @@ public class ComprobantePagoService {
         Integer vueltas = comprobante.getTarifa().getNumeroVueltas();
         Integer tiempo = comprobante.getTarifa().getTiempoMaximo();
 
-        ReporteService reporteService = null;
-        
+
+
+
         Optional<ReporteEntity> optReporteVueltas = reporteService.obtenerPorMes(mesActual).stream()
                 .filter(r -> tipoPorVueltas.equals(r.getTipoReporte()) &&
                         vueltas.equals(r.getNumeroVueltas()) &&
