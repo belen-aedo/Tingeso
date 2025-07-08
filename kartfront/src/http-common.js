@@ -1,7 +1,6 @@
-import axios from "axios";
+import axios from "axios"; 
 
-const kartingServer = "172.203.153.126";
-//const kartingServer = "localhost:80";
+const kartingServer = "localhost:8090";
 
 export default axios.create({
     baseURL: `http://${kartingServer}`,

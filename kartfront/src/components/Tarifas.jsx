@@ -5,58 +5,113 @@ import tarifaService from '../services/tarifa.service';
 function Tarifas() {
   const navigate = useNavigate();
   const [tarifas, setTarifas] = useState([]);
+  const [mostrarMenu, setMostrarMenu] = useState(false);
+  const [mensaje, setMensaje] = useState('');
+  const [tipoMensaje, setTipoMensaje] = useState('');
   const [nueva, setNueva] = useState({
     numeroVueltas: '',
     tiempoMaximo: '',
     precioBase: '',
     duracionReserva: ''
   });
-
-  const [editando, setEditando] = useState(null); // ID de tarifa en edición
+  const [editando, setEditando] = useState(null);
+  const [cargando, setCargando] = useState(false);
 
   useEffect(() => {
     cargarTarifas();
   }, []);
 
   const cargarTarifas = () => {
-    tarifaService.getAll().then((res) => setTarifas(res.data));
+    setCargando(true);
+    tarifaService.getAll()
+      .then((res) => {
+        setTarifas(res.data);
+        setCargando(false);
+      })
+      .catch(() => {
+        setMensaje('Error al cargar tarifas');
+        setTipoMensaje('error');
+        setCargando(false);
+      });
+  };
+
+  const mostrarMensaje = (texto, tipo) => {
+    setMensaje(texto);
+    setTipoMensaje(tipo);
+    setTimeout(() => {
+      setMensaje('');
+      setTipoMensaje('');
+    }, 3000);
   };
 
   const handleChange = (e) => {
     setNueva({ ...nueva, [e.target.name]: e.target.value });
   };
 
+  const validarFormulario = () => {
+    if (!nueva.numeroVueltas || nueva.numeroVueltas <= 0) {
+      mostrarMensaje('El número de vueltas debe ser mayor a 0', 'error');
+      return false;
+    }
+    if (!nueva.tiempoMaximo || nueva.tiempoMaximo <= 0) {
+      mostrarMensaje('El tiempo máximo debe ser mayor a 0', 'error');
+      return false;
+    }
+    if (!nueva.precioBase || nueva.precioBase <= 0) {
+      mostrarMensaje('El precio base debe ser mayor a 0', 'error');
+      return false;
+    }
+    if (!nueva.duracionReserva || nueva.duracionReserva <= 0) {
+      mostrarMensaje('La duración de reserva debe ser mayor a 0', 'error');
+      return false;
+    }
+    return true;
+  };
+
   const crearTarifa = (e) => {
     e.preventDefault();
+    
+    if (!validarFormulario()) return;
+
+    setCargando(true);
+    
     if (editando) {
-      // Si estamos editando, actualizamos
-      tarifaService.actualizar(editando, nueva).then(() => {
-        setNueva({
-          numeroVueltas: '',
-          tiempoMaximo: '',
-          precioBase: '',
-          duracionReserva: ''
+      tarifaService.actualizar(editando, nueva)
+        .then(() => {
+          mostrarMensaje('Tarifa actualizada exitosamente', 'exito');
+          resetearFormulario();
+          cargarTarifas();
+        })
+        .catch(() => {
+          mostrarMensaje('Error al actualizar tarifa', 'error');
+          setCargando(false);
         });
-        setEditando(null);
-        cargarTarifas();
-      });
     } else {
-      // Si no estamos editando, creamos nueva
-      tarifaService.crear(nueva).then(() => {
-        setNueva({
-          numeroVueltas: '',
-          tiempoMaximo: '',
-          precioBase: '',
-          duracionReserva: ''
+      tarifaService.crear(nueva)
+        .then(() => {
+          mostrarMensaje('Tarifa creada exitosamente', 'exito');
+          resetearFormulario();
+          cargarTarifas();
+        })
+        .catch(() => {
+          mostrarMensaje('Error al crear tarifa', 'error');
+          setCargando(false);
         });
-        cargarTarifas();
-      });
     }
   };
 
   const eliminarTarifa = (id) => {
-    if (window.confirm('¿Eliminar esta tarifa?')) {
-      tarifaService.eliminar(id).then(cargarTarifas);
+    if (window.confirm('¿Está seguro de eliminar esta tarifa? Esta acción no se puede deshacer.')) {
+      setCargando(true);
+      tarifaService.eliminar(id)
+        .then(() => {
+          mostrarMensaje('Tarifa eliminada exitosamente', 'exito');
+          cargarTarifas();
+        })
+        .catch(() => {
+          mostrarMensaje('Error al eliminar tarifa', 'error');
+          setCargando(false);
+        });
     }
   };
 
@@ -70,56 +125,549 @@ function Tarifas() {
     });
   };
 
+  const resetearFormulario = () => {
+    setNueva({
+      numeroVueltas: '',
+      tiempoMaximo: '',
+      precioBase: '',
+      duracionReserva: ''
+    });
+    setEditando(null);
+    setCargando(false);
+  };
+
+  const cancelarEdicion = () => {
+    resetearFormulario();
+    mostrarMensaje('Edición cancelada', 'info');
+  };
+
   return (
-    <div className="container">
-      {/* Botones de navegación */}
-      <div>
-        <button onClick={() => navigate('/carros')}>Karts</button>
-        <button onClick={() => navigate('/clientes')}>Clientes</button>
-        <button onClick={() => navigate('/comprobantes')}>Comprobante</button>
-        <button onClick={() => navigate('/reportes')}>Reportes</button>
-        <button onClick={() => navigate('/reservar')}>Reservar</button>
-        <button onClick={() => navigate('/calendario')}>Pista</button>
-      </div>
+    <div style={{ fontFamily: 'Arial, sans-serif' }}>
+      {/* Header fijo rojo */}
+      <header style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '70px',
+        backgroundColor: '#c62828',
+        color: 'white',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        padding: '10px 20px',
+        zIndex: 1000,
+        boxShadow: '0 2px 10px rgba(0,0,0,0.3)'
+      }}>
+        <div style={{ width: '100%', display: 'flex', alignItems: 'center' }}>
+          <button
+            onClick={() => setMostrarMenu(!mostrarMenu)}
+            style={{
+              backgroundColor: 'white',
+              color: '#c62828',
+              border: 'none',
+              borderRadius: '4px',
+              padding: '8px 12px',
+              fontWeight: 'bold',
+              cursor: 'pointer',
+              marginRight: '20px'
+            }}
+          >
+            Menú
+          </button>
+          <div style={{ fontSize: '12px', opacity: 0.8 }}>
+            Sistema de Gestión de Karting
+          </div>
+        </div>
+        <h2 style={{ marginTop: '0px', fontSize: '18px' }}>Gestión de Tarifas</h2>
+      </header>
 
-      <h2>Gestión de Tarifas</h2>
+      {/* Menú lateral */}
+      {mostrarMenu && (
+        <aside style={{
+          position: 'fixed',
+          top: '70px',
+          left: 0,
+          width: '200px',
+          height: 'calc(100vh - 70px)',
+          backgroundColor: '#f5f5f5',
+          padding: '20px',
+          boxShadow: '2px 0 10px rgba(0,0,0,0.1)',
+          zIndex: 999,
+          overflowY: 'auto',
+          borderRight: '3px solid #c62828'
+        }}>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+            <li style={{ marginBottom: '10px' }}>
+              <button 
+                onClick={() => navigate('/carros')}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  backgroundColor: '#c62828',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Karts
+              </button>
+            </li>
+            <li style={{ marginBottom: '10px' }}>
+              <button 
+                onClick={() => navigate('/clientes')}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  backgroundColor: '#c62828',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Clientes
+              </button>
+            </li>
+            <li style={{ marginBottom: '10px' }}>
+              <button 
+                onClick={() => navigate('/calendario')}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  backgroundColor: '#c62828',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Calendario
+              </button>
+            </li>
+            <li style={{ marginBottom: '10px' }}>
+              <button 
+                onClick={() => navigate('/comprobantes')}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  backgroundColor: '#c62828',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Comprobantes
+              </button>
+            </li>
+            <li style={{ marginBottom: '10px' }}>
+              <button 
+                onClick={() => navigate('/reportes')}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  backgroundColor: '#c62828',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Reportes
+              </button>
+            </li>
+            <li style={{ marginBottom: '10px' }}>
+              <button 
+                onClick={() => navigate('/reservar')}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  backgroundColor: '#c62828',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer'
+                }}
+              >
+                Reservas
+              </button>
+            </li>
+            <li style={{ marginBottom: '10px' }}>
+              <button 
+                onClick={() => navigate('/tarifas')}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  backgroundColor: '#4CAF50',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold'
+                }}
+              >
+                Tarifas
+              </button>
+            </li>
+          </ul>
+        </aside>
+      )}
 
-      <form onSubmit={crearTarifa}>
-        <h3>{editando ? 'Editar Tarifa' : 'Agregar Tarifa'}</h3>
-        <input type="number" name="numeroVueltas" placeholder="Vueltas" value={nueva.numeroVueltas} onChange={handleChange} />
-        <input type="number" name="tiempoMaximo" placeholder="Tiempo Máximo" value={nueva.tiempoMaximo} onChange={handleChange} />
-        <input type="number" name="precioBase" placeholder="Precio Base" value={nueva.precioBase} onChange={handleChange} />
-        <input type="number" name="duracionReserva" placeholder="Duración (min)" value={nueva.duracionReserva} onChange={handleChange} />
-        <button type="submit">{editando ? 'Actualizar' : 'Crear'}</button>
-      </form>
+      {/* Contenido principal */}
+      <main style={{
+        marginTop: '90px',
+        marginLeft: mostrarMenu ? '240px' : '20px',
+        marginRight: '20px',
+        transition: 'margin-left 0.3s ease',
+        paddingBottom: '50px'
+      }}>
+        
 
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Vueltas</th>
-            <th>Tiempo Máx</th>
-            <th>Precio</th>
-            <th>Duración</th>
-            <th>Acción</th>
-          </tr>
-        </thead>
-        <tbody>
-          {tarifas.map((t) => (
-            <tr key={t.id}>
-              <td>{t.id}</td>
-              <td>{t.numeroVueltas}</td>
-              <td>{t.tiempoMaximo} min</td>
-              <td>${t.precioBase}</td>
-              <td>{t.duracionReserva} min</td>
-              <td>
-                <button onClick={() => cargarParaEditar(t)}>Editar</button>
-                <button onClick={() => eliminarTarifa(t.id)}>Eliminar</button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+        {/* Mensajes de feedback */}
+        {mensaje && (
+          <div style={{
+            backgroundColor: tipoMensaje === 'error' ? '#ffebee' : 
+                           tipoMensaje === 'exito' ? '#e8f5e8' : '#fff3e0',
+            border: `1px solid ${tipoMensaje === 'error' ? '#f44336' : 
+                                tipoMensaje === 'exito' ? '#4CAF50' : '#ff9800'}`,
+            borderRadius: '4px',
+            padding: '12px',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            <span style={{ 
+              fontSize: '18px',
+              color: tipoMensaje === 'error' ? '#f44336' : 
+                     tipoMensaje === 'exito' ? '#4CAF50' : '#ff9800'
+            }}>
+              {tipoMensaje === 'error' ? '⚠️' : tipoMensaje === 'exito' ? '✅' : 'ℹ️'}
+            </span>
+            <span style={{
+              color: tipoMensaje === 'error' ? '#f44336' : 
+                     tipoMensaje === 'exito' ? '#4CAF50' : '#ff9800',
+              fontWeight: 'bold'
+            }}>
+              {mensaje}
+            </span>
+          </div>
+        )}
+
+        {/* Formulario de tarifa */}
+        <form onSubmit={crearTarifa} style={{ 
+          backgroundColor: '#fff',
+          border: '1px solid #ddd',
+          borderRadius: '8px',
+          padding: '20px',
+          marginBottom: '30px',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        }}>
+          <h4 style={{ 
+            color: '#c62828',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
+          }}>
+            {editando ? 'Editar Tarifa' : 'Nueva Tarifa'}
+            {editando && (
+              <span style={{
+                backgroundColor: '#ff9800',
+                color: 'white',
+                padding: '4px 8px',
+                borderRadius: '12px',
+                fontSize: '12px',
+                fontWeight: 'bold'
+              }}>
+                EDITANDO ID: {editando}
+              </span>
+            )}
+          </h4>
+
+          <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: '150px' }}>
+              <label style={{ 
+                fontWeight: 'bold', 
+                marginBottom: '5px',
+                color: '#333'
+              }}>
+                Número de Vueltas *
+              </label>
+              <input 
+                type="number" 
+                name="numeroVueltas" 
+                placeholder="Ej: 10"
+                value={nueva.numeroVueltas} 
+                onChange={handleChange}
+                required
+                min="1"
+                style={{ 
+                  padding: '10px', 
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  fontSize: '14px'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: '150px' }}>
+              <label style={{ 
+                fontWeight: 'bold', 
+                marginBottom: '5px',
+                color: '#333'
+              }}>
+                Tiempo Máximo (min) *
+              </label>
+              <input 
+                type="number" 
+                name="tiempoMaximo" 
+                placeholder="Ej: 15"
+                value={nueva.tiempoMaximo} 
+                onChange={handleChange}
+                required
+                min="1"
+                style={{ 
+                  padding: '10px', 
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  fontSize: '14px'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: '150px' }}>
+              <label style={{ 
+                fontWeight: 'bold', 
+                marginBottom: '5px',
+                color: '#333'
+              }}>
+                Precio Base ($) *
+              </label>
+              <input 
+                type="number" 
+                name="precioBase" 
+                placeholder="Ej: 5000"
+                value={nueva.precioBase} 
+                onChange={handleChange}
+                required
+                min="1"
+                style={{ 
+                  padding: '10px', 
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  fontSize: '14px'
+                }}
+              />
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', minWidth: '150px' }}>
+              <label style={{ 
+                fontWeight: 'bold', 
+                marginBottom: '5px',
+                color: '#333'
+              }}>
+                Duración Reserva (min) *
+              </label>
+              <input 
+                type="number" 
+                name="duracionReserva" 
+                placeholder="Ej: 30"
+                value={nueva.duracionReserva} 
+                onChange={handleChange}
+                required
+                min="1"
+                style={{ 
+                  padding: '10px', 
+                  borderRadius: '4px',
+                  border: '1px solid #ddd',
+                  fontSize: '14px'
+                }}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+            <button 
+              type="submit" 
+              disabled={cargando}
+              style={{
+                backgroundColor: editando ? '#ff9800' : '#4CAF50',
+                color: 'white',
+                border: 'none',
+                padding: '12px 24px',
+                borderRadius: '4px',
+                cursor: cargando ? 'not-allowed' : 'pointer',
+                fontSize: '16px',
+                fontWeight: 'bold',
+                opacity: cargando ? 0.6 : 1
+              }}
+            >
+              {cargando ? 'Procesando...' : editando ? 'Actualizar' : 'Crear Tarifa'}
+            </button>
+
+            {editando && (
+              <button 
+                type="button"
+                onClick={cancelarEdicion}
+                style={{
+                  backgroundColor: '#f44336',
+                  color: 'white',
+                  border: 'none',
+                  padding: '12px 24px',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  fontSize: '16px',
+                  fontWeight: 'bold'
+                }}
+              >
+                Cancelar
+              </button>
+            )}
+          </div>
+        </form>
+
+        {/* Tabla de tarifas */}
+        <div style={{
+          backgroundColor: '#fff',
+          border: '1px solid #ddd',
+          borderRadius: '8px',
+          overflow: 'hidden',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+        }}>
+          <h4 style={{ 
+            backgroundColor: '#f8f9fa',
+            margin: 0,
+            padding: '15px 20px',
+            borderBottom: '1px solid #ddd',
+            color: '#c62828'
+          }}>
+            Tarifas Registradas ({tarifas.length})
+          </h4>
+
+          {cargando ? (
+            <div style={{ textAlign: 'center', padding: '40px' }}>
+              <div style={{ color: '#666' }}>Cargando tarifas...</div>
+            </div>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead style={{ backgroundColor: '#f2f2f2' }}>
+                <tr>
+                  <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>ID</th>
+                  <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Vueltas</th>
+                  <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Tiempo Máx</th>
+                  <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Precio Base</th>
+                  <th style={{ padding: '12px', textAlign: 'left', borderBottom: '1px solid #ddd' }}>Duración</th>
+                  <th style={{ padding: '12px', textAlign: 'center', borderBottom: '1px solid #ddd' }}>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tarifas.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" style={{ textAlign: 'center', padding: '40px', color: '#666' }}>
+                      <div>No hay tarifas registradas</div>
+                      <div style={{ fontSize: '14px', marginTop: '5px' }}>
+                        Crea tu primera tarifa usando el formulario de arriba
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  tarifas.map((t, index) => (
+                    <tr key={t.id} style={{ 
+                      backgroundColor: index % 2 === 0 ? '#fff' : '#f9f9f9',
+                      borderBottom: '1px solid #eee'
+                    }}>
+                      <td style={{ padding: '12px', fontWeight: 'bold' }}>
+                        {editando === t.id && (
+                          <span style={{
+                            backgroundColor: '#ff9800',
+                            color: 'white',
+                            padding: '2px 6px',
+                            borderRadius: '8px',
+                            fontSize: '10px',
+                            marginRight: '5px'
+                          }}>
+                            EDITANDO
+                          </span>
+                        )}
+                        #{t.id}
+                      </td>
+                      <td style={{ padding: '12px' }}>
+                        <span style={{
+                          backgroundColor: '#2196F3',
+                          color: 'white',
+                          padding: '4px 8px',
+                          borderRadius: '12px',
+                          fontSize: '12px',
+                          fontWeight: 'bold'
+                        }}>
+                          {t.numeroVueltas} vueltas
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px' }}>
+                        <span style={{ color: '#666' }}>
+                          {t.tiempoMaximo} min
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px', fontWeight: 'bold', color: '#4CAF50' }}>
+                        ${t.precioBase?.toLocaleString()}
+                      </td>
+                      <td style={{ padding: '12px' }}>
+                        <span style={{ color: '#666' }}>
+                          {t.duracionReserva} min
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px', textAlign: 'center' }}>
+                        <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
+                          <button
+                            onClick={() => cargarParaEditar(t)}
+                            disabled={cargando}
+                            style={{
+                              backgroundColor: '#ff9800',
+                              color: 'white',
+                              border: 'none',
+                              padding: '6px 12px',
+                              borderRadius: '4px',
+                              cursor: cargando ? 'not-allowed' : 'pointer',
+                              fontSize: '12px',
+                              fontWeight: 'bold',
+                              opacity: cargando ? 0.6 : 1
+                            }}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            onClick={() => eliminarTarifa(t.id)}
+                            disabled={cargando}
+                            style={{
+                              backgroundColor: '#f44336',
+                              color: 'white',
+                              border: 'none',
+                              padding: '6px 12px',
+                              borderRadius: '4px',
+                              cursor: cargando ? 'not-allowed' : 'pointer',
+                              fontSize: '12px',
+                              fontWeight: 'bold',
+                              opacity: cargando ? 0.6 : 1
+                            }}
+                          >
+                            Eliminar
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
+        
+          
+        
+      </main>
     </div>
   );
 }

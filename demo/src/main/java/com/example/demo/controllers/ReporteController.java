@@ -1,6 +1,7 @@
 package com.example.demo.controllers;
 
 import com.example.demo.entities.ReporteEntity;
+import com.example.demo.entities.ReporteMensualEntity;
 import com.example.demo.service.ReporteService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -18,45 +19,74 @@ public class ReporteController {
     @Autowired
     private ReporteService reporteService;
 
-    // Crear nuevo reporte
+    // ===================== REPORTES INDIVIDUALES =====================
 
-    @PostMapping("/")
+    @PostMapping("/individual")
     public ResponseEntity<?> crearReporte(@RequestBody ReporteEntity reporte) {
-        ReporteEntity nuevoReporte = reporteService.guardarReporte(reporte);
-        return ResponseEntity.ok(nuevoReporte);
+        try {
+            ReporteEntity nuevoReporte = reporteService.guardarReporte(reporte);
+            return ResponseEntity.ok(nuevoReporte);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error al crear el reporte: " + e.getMessage());
+        }
     }
 
-
-
-
-    // Obtener todos los reportes
-    @GetMapping("/")
-    public ResponseEntity<List<ReporteEntity>> obtenerTodos() {
+    @GetMapping("/individual")
+    public ResponseEntity<List<ReporteEntity>> obtenerTodosIndividuales() {
         return ResponseEntity.ok(reporteService.obtenerTodos());
     }
 
-    // Obtener por tipo (PorVueltas o PorPersonas)
-    @GetMapping("/tipo/{tipo}")
-    public ResponseEntity<List<ReporteEntity>> obtenerPorTipo(@PathVariable String tipo) {
+    @GetMapping("/individual/tipo/{tipo}")
+    public ResponseEntity<List<ReporteEntity>> obtenerIndividualesPorTipo(@PathVariable String tipo) {
         return ResponseEntity.ok(reporteService.obtenerPorTipo(tipo));
     }
 
-    // Obtener por mes
-    @GetMapping("/mes")
-    public ResponseEntity<List<ReporteEntity>> obtenerPorMes(@RequestParam String fecha) {
-        LocalDate mes = LocalDate.parse(fecha); // formato: YYYY-MM-DD
-        return ResponseEntity.ok(reporteService.obtenerPorMes(mes));
+    @GetMapping("/individual/fecha")
+    public ResponseEntity<List<ReporteEntity>> obtenerPorFecha(@RequestParam String fecha) {
+        LocalDate fechaLocal = LocalDate.parse(fecha);
+        return ResponseEntity.ok(reporteService.obtenerPorFecha(fechaLocal));
     }
 
-    // Obtener reporte por ID
-    @GetMapping("/{id}")
-    public ResponseEntity<ReporteEntity> obtenerPorId(@PathVariable Long id) {
+    @GetMapping("/individual/mes-anio")
+    public ResponseEntity<List<ReporteEntity>> obtenerPorMesYAnio(@RequestParam int mes, @RequestParam int anio) {
+        return ResponseEntity.ok(reporteService.obtenerPorMesYAnio(mes, anio));
+    }
+
+    @GetMapping("/individual/{id}")
+    public ResponseEntity<ReporteEntity> obtenerIndividualPorId(@PathVariable Long id) {
         Optional<ReporteEntity> reporte = reporteService.obtenerPorId(id);
         return reporte.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
     }
-    @DeleteMapping("/{id}")
-    public ResponseEntity<?> eliminarReporte(@PathVariable Long id) {
-        reporteService.eliminarReporte(id);
-        return ResponseEntity.noContent().build(); // 204 No Content, sin mensaje
+
+    @DeleteMapping("/individual/{id}")
+    public ResponseEntity<?> eliminarReporteIndividual(@PathVariable Long id) {
+        try {
+            reporteService.eliminarReporte(id);
+            return ResponseEntity.noContent().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body("Error al eliminar el reporte: " + e.getMessage());
+        }
+    }
+
+    // ===================== REPORTES MENSUALES =====================
+
+    @GetMapping("/mensual")
+    public ResponseEntity<List<ReporteMensualEntity>> obtenerReportesMensuales() {
+        return ResponseEntity.ok(reporteService.obtenerReportesMensuales());
+    }
+
+    @GetMapping("/mensual/tipo/{tipo}")
+    public ResponseEntity<List<ReporteMensualEntity>> obtenerMensualesPorTipo(@PathVariable String tipo) {
+        return ResponseEntity.ok(reporteService.obtenerReportesMensualesPorTipo(tipo));
+    }
+
+    @GetMapping("/mensual/mes-anio")
+    public ResponseEntity<List<ReporteMensualEntity>> obtenerMensualesPorMesYAnio(@RequestParam int mes, @RequestParam int anio) {
+        return ResponseEntity.ok(reporteService.obtenerReportesMensualesPorMesYAnio(mes, anio));
+    }
+
+    @GetMapping("/mensual/anio/{anio}")
+    public ResponseEntity<List<ReporteMensualEntity>> obtenerMensualesPorAnio(@PathVariable int anio) {
+        return ResponseEntity.ok(reporteService.obtenerReportesMensualesPorAnio(anio));
     }
 }

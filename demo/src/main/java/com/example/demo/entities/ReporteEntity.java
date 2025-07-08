@@ -7,7 +7,6 @@ import lombok.NoArgsConstructor;
 import jakarta.persistence.*;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "reportes")
@@ -22,8 +21,7 @@ public class ReporteEntity {
     private Long id;
 
     private String tipoReporte;  // "PorVueltas", "PorPersonas"
-     //mes generado
-    private LocalDate mesGenerado;
+    private LocalDate fecha;     // Fecha específica del reporte
     private double ingresoTotal;
 
     // Para reportes por vueltas
@@ -34,4 +32,12 @@ public class ReporteEntity {
     private Integer minPersonas;
     private Integer maxPersonas;
 
+    // Descripción opcional para identificar mejor el reporte
+    private String descripcion;
+    private LocalDate mesGenerado;
+
+    public void setMesGenerado(LocalDate mesGenerado) {
+        this.mesGenerado = mesGenerado;
     }
+
+}

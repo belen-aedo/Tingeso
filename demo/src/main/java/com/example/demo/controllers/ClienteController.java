@@ -67,10 +67,17 @@ public class ClienteController {
         return ResponseEntity.ok().build();
     }
 
-    // Eliminar cliente
     @DeleteMapping("/{rut}")
-    public ResponseEntity<Void> deleteCliente(@PathVariable String rut) {
-        clienteService.deleteCliente(rut);
-        return ResponseEntity.ok().build();
+    public ResponseEntity<?> deleteCliente(@PathVariable String rut) {
+        try {
+            clienteService.deleteCliente(rut);
+            return ResponseEntity.noContent().build(); // 204
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(e.getMessage()); // 400
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error interno al eliminar cliente"); // 500
+        }
     }
+
+
 }
