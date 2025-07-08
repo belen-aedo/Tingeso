@@ -50,7 +50,7 @@ public class ComprobantePagoService {
         this.tarifaService = tarifaService;
         this.mailSender = mailSender;
     }
-
+// Método para obtener todos los comprobantes de pago
     public List<ComprobantePagoEntity> getAllComprobantes() {
         return comprobantePagoRepository.findAll();
     }
