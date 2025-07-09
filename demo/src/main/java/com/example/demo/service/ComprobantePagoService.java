@@ -8,6 +8,7 @@ import org.apache.pdfbox.pdmodel.PDPageContentStream;
 import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -41,7 +42,7 @@ public class ComprobantePagoService {
     public ComprobantePagoService(
             ComprobantePagoRepository comprobantePagoRepository,
             ClienteService clienteService,
-            ReservaService reservaService,
+            @Lazy ReservaService reservaService,  // Agregar @Lazy aquí
             TarifaService tarifaService,
             JavaMailSender mailSender) {
         this.comprobantePagoRepository = comprobantePagoRepository;

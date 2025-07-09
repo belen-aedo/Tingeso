@@ -1,16 +1,16 @@
 import { BrowserRouter as Router, Route, Routes, Navigate } from 'react-router-dom';
-import Carros from './components/Carros.jsx';
-import Clientes from './components/Clientes.jsx';
-import Comprobante from './components/Comprobante.jsx';
+import Carros from './components/carros.jsx';
+import Clientes from './components/clientes.jsx';
+import Comprobante from './components/comprobante.jsx';
 
-import Reportes from './components/Reportes.jsx';
-import Reservar from './components/Reservar.jsx';
-import Tarifas from './components/Tarifas.jsx';
-import Pista from './components/Calendario.jsx';
+import Reportes from './components/reportes.jsx';
+import Reservar from './components/reservar.jsx';
+import Tarifas from './components/tarifas.jsx';
+import Pista from './components/calendario.jsx';
 import './App.css';
 
 function App() {
-  const isLoggedIn = true;
+  
 
   return (
     <Router>

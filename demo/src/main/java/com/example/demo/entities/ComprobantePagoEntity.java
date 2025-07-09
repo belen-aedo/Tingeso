@@ -1,5 +1,6 @@
 package com.example.demo.entities;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -15,30 +16,30 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class ComprobantePagoEntity {
 
         @Id
         @GeneratedValue(strategy = GenerationType.IDENTITY)
         private Long id;
 
-        @ManyToOne
+        @ManyToOne(fetch = FetchType.LAZY)
         @JoinColumn(name = "clientes_id", nullable = false)
-        //del cliente obtendremos el RUT que conectaremos con la reserva
+        @JsonIgnoreProperties({"comprobantes", "reservas", "hibernateLazyInitializer", "handler"})
         private ClienteEntity cliente;
 
-        // Relación con la reserva asociada
-        @ManyToOne
+        @ManyToOne(fetch = FetchType.LAZY)
         @JoinColumn(name = "reserva_id", nullable = false)
-        //al obtener la reserva con el RUT del cliente obtendremos todos los datos de esta
+        @JsonIgnoreProperties({"comprobante", "cliente", "hibernateLazyInitializer", "handler"})
         private ReservaEntity reserva;
 
-        // Relación con la tarifa aplicada
-        @ManyToOne
+        @ManyToOne(fetch = FetchType.LAZY)
         @JoinColumn(name = "tarifa_id", nullable = false)
+        @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+        private TarifaEntity tarifa;
         //de la reserva obtendremos el tiempo de reserva; el cual tendremos que buscar
         //en la tarifa para obtener el precio base por el tiempo de reserva
         // tiempo maxim y los datos del número de vueltas
-        private TarifaEntity tarifa;
 
         //el descuento por grupo se calculará sumando los acompañantes más 1
         //depende de cuantas personas sean es el descuento aplicable

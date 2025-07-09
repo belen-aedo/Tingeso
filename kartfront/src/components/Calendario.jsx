@@ -34,6 +34,11 @@ const localizer = dateFnsLocalizer({
 export default function CalendarComponent() {
   const [events, setEvents] = useState([]); // Estado para almacenar los eventos
   const [mostrarMenu, setMostrarMenu] = useState(false); // Estado para mostrar/ocultar menú
+  
+  // ESTADOS AGREGADOS PARA CONTROLAR EL CALENDARIO
+  const [currentDate, setCurrentDate] = useState(new Date()); // Fecha actual del calendario
+  const [currentView, setCurrentView] = useState('week'); // Vista actual del calendario
+  
   const navigate = useNavigate(); // Hook para redireccionar a otras rutas
 
   // Hook que se ejecuta al montar el componente
@@ -53,6 +58,16 @@ export default function CalendarComponent() {
       setEvents(eventos); // Actualiza el estado con los eventos
     });
   }, []); // Dependencias vacías → se ejecuta una vez al montar
+
+  // FUNCIÓN PARA MANEJAR NAVEGACIÓN DEL CALENDARIO
+  const handleNavigate = (newDate) => {
+    setCurrentDate(newDate);
+  };
+
+  // FUNCIÓN PARA MANEJAR CAMBIO DE VISTA
+  const handleViewChange = (view) => {
+    setCurrentView(view);
+  };
 
   return (
     <div style={{ fontFamily: 'Arial, sans-serif' }}>
@@ -238,7 +253,13 @@ export default function CalendarComponent() {
             events={events} // Eventos a mostrar
             startAccessor="start" // Clave para la fecha de inicio
             endAccessor="end" // Clave para la fecha de fin
-            defaultView="week" // Vista predeterminada: semana
+            
+            // PROPIEDADES AGREGADAS PARA CONTROLAR EL CALENDARIO
+            date={currentDate} // Fecha actual controlada
+            view={currentView} // Vista actual controlada
+            onNavigate={handleNavigate} // Función para manejar navegación
+            onView={handleViewChange} // Función para cambiar vista
+            
             views={["week", "day"]} // Vistas disponibles: semana y día
             step={30} // Intervalo entre bloques de tiempo (30 min)
             timeslots={2} // Número de espacios por bloque

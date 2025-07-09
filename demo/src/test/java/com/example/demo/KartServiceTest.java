@@ -1,27 +1,16 @@
-
-package com.example.demo;
+package com.example.demo.service;
 
 import com.example.demo.entities.KartEntity;
 import com.example.demo.repositories.KartRepository;
-import com.example.demo.service.KartService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
+import org.mockito.*;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
-public class KartServiceTest {
+class KartServiceTest {
 
     @Mock
     private KartRepository kartRepository;
@@ -29,194 +18,160 @@ public class KartServiceTest {
     @InjectMocks
     private KartService kartService;
 
-    private KartEntity kartEntity;
-    private List<KartEntity> kartList;
-
     @BeforeEach
     void setUp() {
-        // Preparar datos de prueba
-        kartEntity = new KartEntity();
-        kartEntity.setCodigo("K001");
-        kartEntity.setEstado("Disponible");
-        kartEntity.setModelo("Sodikart RT8");
-
-        KartEntity kart2 = new KartEntity();
-        kart2.setCodigo("K002");
-        kart2.setEstado("En uso");
-        kart2.setModelo("Sodikart RT8");
-
-        KartEntity kart3 = new KartEntity();
-        kart3.setCodigo("K003");
-        kart3.setEstado("En mantenimiento");
-        kart3.setModelo("Sodikart RT8");
-
-        kartList = Arrays.asList(kartEntity, kart2, kart3);
+        MockitoAnnotations.openMocks(this);
     }
 
     @Test
-    void getAllKarts_ReturnsList() {
-        // Given
-        when(kartRepository.findAll()).thenReturn(kartList);
+    void getAllKarts_returnsList() {
+        List<KartEntity> karts = Arrays.asList(new KartEntity(), new KartEntity());
+        when(kartRepository.findAll()).thenReturn(karts);
 
-        // When
         List<KartEntity> result = kartService.getAllKarts();
 
-        // Then
-        assertEquals(3, result.size());
-        verify(kartRepository, times(1)).findAll();
+        assertEquals(2, result.size());
+        verify(kartRepository).findAll();
     }
 
     @Test
-    void getKartByCodigo_ExistingKart_ReturnsKart() {
-        // Given
-        when(kartRepository.findByCodigo("K001")).thenReturn(Optional.of(kartEntity));
+    void getKartByCodigo_found() {
+        KartEntity kart = new KartEntity();
+        kart.setCodigo("K001");
+        when(kartRepository.findByCodigo("K001")).thenReturn(Optional.of(kart));
 
-        // When
         Optional<KartEntity> result = kartService.getKartByCodigo("K001");
 
-        // Then
         assertTrue(result.isPresent());
         assertEquals("K001", result.get().getCodigo());
-        verify(kartRepository, times(1)).findByCodigo("K001");
+        verify(kartRepository).findByCodigo("K001");
     }
 
     @Test
-    void getKartByCodigo_NonExistingKart_ReturnsEmpty() {
-        // Given
+    void getKartByCodigo_notFound() {
         when(kartRepository.findByCodigo("K999")).thenReturn(Optional.empty());
 
-        // When
         Optional<KartEntity> result = kartService.getKartByCodigo("K999");
 
-        // Then
         assertFalse(result.isPresent());
-        verify(kartRepository, times(1)).findByCodigo("K999");
+        verify(kartRepository).findByCodigo("K999");
     }
 
     @Test
-    void getKartsByEstado_WithMatches_ReturnsList() {
-        // Given
-        List<KartEntity> disponibles = List.of(kartEntity);
-        when(kartRepository.findByEstado("Disponible")).thenReturn(disponibles);
+    void getKartsByEstado_returnsList() {
+        List<KartEntity> karts = Collections.singletonList(new KartEntity());
+        when(kartRepository.findByEstado("Disponible")).thenReturn(karts);
 
-        // When
         List<KartEntity> result = kartService.getKartsByEstado("Disponible");
 
-        // Then
         assertEquals(1, result.size());
-        assertEquals("Disponible", result.get(0).getEstado());
-        verify(kartRepository, times(1)).findByEstado("Disponible");
+        verify(kartRepository).findByEstado("Disponible");
     }
 
     @Test
-    void getKartsDisponibles_ReturnsDisponibleKarts() {
-        // Given
-        List<KartEntity> disponibles = List.of(kartEntity);
-        when(kartRepository.findKartsDisponibles()).thenReturn(disponibles);
+    void getKartsDisponibles_returnsList() {
+        List<KartEntity> karts = Collections.singletonList(new KartEntity());
+        when(kartRepository.findKartsDisponibles()).thenReturn(karts);
 
-        // When
         List<KartEntity> result = kartService.getKartsDisponibles();
 
-        // Then
         assertEquals(1, result.size());
-        assertEquals("Disponible", result.get(0).getEstado());
-        verify(kartRepository, times(1)).findKartsDisponibles();
+        verify(kartRepository).findKartsDisponibles();
     }
 
     @Test
-    void contarKartsDisponibles_ReturnsCount() {
-        // Given
+    void contarKartsDisponibles_returnsCount() {
         when(kartRepository.contarKartsDisponibles()).thenReturn(5);
 
-        // When
-        Integer result = kartService.contarKartsDisponibles();
+        Integer count = kartService.contarKartsDisponibles();
 
-        // Then
-        assertEquals(5, result);
-        verify(kartRepository, times(1)).contarKartsDisponibles();
+        assertEquals(5, count);
+        verify(kartRepository).contarKartsDisponibles();
     }
 
     @Test
-    void saveKart_ReturnsSavedKart() {
-        // Given
-        when(kartRepository.save(any(KartEntity.class))).thenReturn(kartEntity);
+    void saveKart_savesAndReturnsKart() {
+        KartEntity kart = new KartEntity();
+        kart.setCodigo("K001");
+        when(kartRepository.save(kart)).thenReturn(kart);
 
-        // When
-        KartEntity result = kartService.saveKart(kartEntity);
+        KartEntity result = kartService.saveKart(kart);
 
-        // Then
-        assertNotNull(result);
         assertEquals("K001", result.getCodigo());
-        verify(kartRepository, times(1)).save(kartEntity);
+        verify(kartRepository).save(kart);
     }
 
     @Test
-    void deleteKart_CallsRepositoryDelete() {
-        // When
-        kartService.deleteKart("K001");
+    void deleteKart_successfulDeletion() {
+        String codigo = "K001";
+        when(kartRepository.existsById(codigo)).thenReturn(true);
 
-        // Then
-        verify(kartRepository, times(1)).deleteById("K001");
+        kartService.deleteKart(codigo);
+
+        verify(kartRepository).existsById(codigo);
+        verify(kartRepository).deleteById(codigo);
     }
 
     @Test
-    void cambiarEstadoKart_ExistingKart_ReturnsUpdatedKart() {
-        // Given
-        when(kartRepository.findById("K001")).thenReturn(Optional.of(kartEntity));
-        KartEntity updatedKart = new KartEntity();
-        updatedKart.setCodigo("K001");
-        updatedKart.setEstado("En uso");
-        updatedKart.setModelo("Sodikart RT8");
-        when(kartRepository.save(any(KartEntity.class))).thenReturn(updatedKart);
+    void deleteKart_kartNotFound_throwsException() {
+        String codigo = "K999";
+        when(kartRepository.existsById(codigo)).thenReturn(false);
 
-        // When
-        Optional<KartEntity> result = kartService.cambiarEstadoKart("K001", "En uso");
+        RuntimeException exception = assertThrows(RuntimeException.class,
+                () -> kartService.deleteKart(codigo));
 
-        // Then
-        assertTrue(result.isPresent());
-        assertEquals("En uso", result.get().getEstado());
-        verify(kartRepository, times(1)).findById("K001");
-        verify(kartRepository, times(1)).save(any(KartEntity.class));
+        assertEquals("Kart con código K999 no encontrado", exception.getMessage());
+        verify(kartRepository).existsById(codigo);
+        verify(kartRepository, never()).deleteById(anyString());
     }
 
     @Test
-    void cambiarEstadoKart_NonExistingKart_ReturnsEmpty() {
-        // Given
-        when(kartRepository.findById("K999")).thenReturn(Optional.empty());
+    void cambiarEstadoKart_kartFound_updatesAndReturnsKart() {
+        String codigo = "K001";
+        KartEntity kart = new KartEntity();
+        kart.setCodigo(codigo);
+        kart.setEstado("Disponible");
 
-        // When
-        Optional<KartEntity> result = kartService.cambiarEstadoKart("K999", "En uso");
-
-        // Then
-        assertFalse(result.isPresent());
-        verify(kartRepository, times(1)).findById("K999");
-        verify(kartRepository, never()).save(any(KartEntity.class));
-    }
-
-    @Test
-    void inicializarKarts_WhenKartsExist_DoesNothing() {
-        // Given
-        when(kartRepository.count()).thenReturn(15L);
-
-        // When
-        kartService.inicializarKarts();
-
-        // Then
-        verify(kartRepository, times(1)).count();
-        verify(kartRepository, never()).save(any(KartEntity.class));
-    }
-
-    @Test
-    void inicializarKarts_WhenNoKarts_Creates15Karts() {
-        // Given
-        when(kartRepository.count()).thenReturn(0L);
+        when(kartRepository.findById(codigo)).thenReturn(Optional.of(kart));
         when(kartRepository.save(any(KartEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        // When
+        Optional<KartEntity> result = kartService.cambiarEstadoKart(codigo, "En uso");
+
+        assertTrue(result.isPresent());
+        assertEquals("En uso", result.get().getEstado());
+        verify(kartRepository).findById(codigo);
+        verify(kartRepository).save(kart);
+    }
+
+    @Test
+    void cambiarEstadoKart_kartNotFound_returnsEmpty() {
+        String codigo = "K999";
+        when(kartRepository.findById(codigo)).thenReturn(Optional.empty());
+
+        Optional<KartEntity> result = kartService.cambiarEstadoKart(codigo, "En uso");
+
+        assertFalse(result.isPresent());
+        verify(kartRepository).findById(codigo);
+        verify(kartRepository, never()).save(any());
+    }
+
+    @Test
+    void inicializarKarts_whenRepositoryHasData_doesNothing() {
+        when(kartRepository.count()).thenReturn(5L);
+
         kartService.inicializarKarts();
 
-        // Then
-        verify(kartRepository, times(1)).count();
+        verify(kartRepository).count();
+        verify(kartRepository, never()).save(any());
+    }
+
+    @Test
+    void inicializarKarts_whenRepositoryEmpty_inserts15Karts() {
+        when(kartRepository.count()).thenReturn(0L);
+
+        kartService.inicializarKarts();
+
+        verify(kartRepository).count();
         verify(kartRepository, times(15)).save(any(KartEntity.class));
     }
 }

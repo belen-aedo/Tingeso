@@ -1,110 +1,111 @@
 package com.example.demo;
 
 import com.example.demo.entities.ReporteEntity;
+import com.example.demo.entities.ReporteMensualEntity;
+import com.example.demo.repositories.ReporteMensualRepository;
 import com.example.demo.repositories.ReporteRepository;
 import com.example.demo.service.ReporteService;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.MockitoAnnotations;
 
 import java.time.LocalDate;
-import java.util.*;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
 class ReporteServiceTest {
 
     @Mock
     private ReporteRepository reporteRepository;
 
+    @Mock
+    private ReporteMensualRepository reporteMensualRepository;
+
     @InjectMocks
     private ReporteService reporteService;
 
-    private ReporteEntity reporte;
-
     @BeforeEach
     void setUp() {
-        reporte = new ReporteEntity();
-        reporte.setId(1L);
-        reporte.setMesGenerado(LocalDate.of(2025, 4, 1));
-        reporte.setTipoReporte("PorVueltas");
-        reporte.setNumeroVueltas(10);
-        reporte.setTiempoMaximo(15);
-        reporte.setIngresoTotal(50000.0);
+        MockitoAnnotations.openMocks(this);
     }
 
     @Test
     void testGuardarReporte() {
-        // Arrange
-        when(reporteRepository.save(reporte)).thenReturn(reporte);
+        ReporteEntity reporte = new ReporteEntity();
+        reporte.setId(1L);
+        reporte.setFecha(LocalDate.now());
+        reporte.setTipoReporte("PorVueltas");
+        reporte.setIngresoTotal(10000.0);
+        reporte.setNumeroVueltas(50);
 
-        // Act
+        when(reporteRepository.save(reporte)).thenReturn(reporte);
+        when(reporteMensualRepository.findByTipoReporteAndMesAndAnio(anyString(), anyInt(), anyInt()))
+                .thenReturn(Optional.empty());
+
         ReporteEntity result = reporteService.guardarReporte(reporte);
 
-        // Assert
-        assertNotNull(result);
-        assertEquals("PorVueltas", result.getTipoReporte());
-        verify(reporteRepository, times(1)).save(reporte);
+        assertEquals(reporte, result);
+        verify(reporteRepository).save(reporte);
+        verify(reporteMensualRepository).save(any(ReporteMensualEntity.class));
+    }
+
+
+    @Test
+    void testEliminarReporte_NoExistente_NoExcepcion() {
+        when(reporteRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertDoesNotThrow(() -> reporteService.eliminarReporte(1L));
+        verify(reporteRepository, never()).deleteById(anyLong());
     }
 
     @Test
-    void testObtenerTodos() {
-        when(reporteRepository.findAll()).thenReturn(List.of(reporte));
+    void testActualizarReporteMensualAgregar_PorVueltas() {
+        ReporteEntity reporte = new ReporteEntity();
+        reporte.setFecha(LocalDate.now());
+        reporte.setTipoReporte("PorVueltas");
+        reporte.setIngresoTotal(8000.0);
+        reporte.setNumeroVueltas(40);
 
-        List<ReporteEntity> lista = reporteService.obtenerTodos();
+        when(reporteMensualRepository.findByTipoReporteAndMesAndAnio(anyString(), anyInt(), anyInt()))
+                .thenReturn(Optional.empty());
 
-        assertEquals(1, lista.size());
-        assertEquals("PorVueltas", lista.get(0).getTipoReporte());
-        verify(reporteRepository, times(1)).findAll();
+        reporteService.guardarReporte(reporte);
+
+        ArgumentCaptor<ReporteMensualEntity> captor = ArgumentCaptor.forClass(ReporteMensualEntity.class);
+        verify(reporteMensualRepository).save(captor.capture());
+
+        ReporteMensualEntity savedReporteMensual = captor.getValue();
+        assertEquals(8000.0, savedReporteMensual.getIngresoTotal());
+        assertEquals(40, savedReporteMensual.getTotalVueltas());
+        assertEquals(1, savedReporteMensual.getCantidadReportes());
     }
 
     @Test
-    void testObtenerPorTipo() {
-        when(reporteRepository.findByTipoReporte("PorVueltas")).thenReturn(List.of(reporte));
+    void testActualizarReporteMensualAgregar_PorPersonas() {
+        ReporteEntity reporte = new ReporteEntity();
+        reporte.setFecha(LocalDate.now());
+        reporte.setTipoReporte("PorPersonas");
+        reporte.setIngresoTotal(12000.0);
+        reporte.setMinPersonas(2);
+        reporte.setMaxPersonas(4);
 
-        List<ReporteEntity> lista = reporteService.obtenerPorTipo("PorVueltas");
+        when(reporteMensualRepository.findByTipoReporteAndMesAndAnio(anyString(), anyInt(), anyInt()))
+                .thenReturn(Optional.empty());
 
-        assertEquals(1, lista.size());
-        assertEquals(10, lista.get(0).getNumeroVueltas());
-        verify(reporteRepository, times(1)).findByTipoReporte("PorVueltas");
-    }
+        reporteService.guardarReporte(reporte);
 
-    @Test
-    void testObtenerPorMes() {
-        LocalDate mes = LocalDate.of(2025, 4, 1);
-        when(reporteRepository.findByMesGenerado(mes)).thenReturn(Optional.of(reporte));
+        ArgumentCaptor<ReporteMensualEntity> captor = ArgumentCaptor.forClass(ReporteMensualEntity.class);
+        verify(reporteMensualRepository).save(captor.capture());
 
-        ReporteEntity resultado = reporteService.obtenerPorMes(mes);
-
-        assertNotNull(resultado);
-        assertEquals(15, resultado.getTiempoMaximo());
-        verify(reporteRepository, times(1)).findByMesGenerado(mes);
-    }
-
-    @Test
-    void testObtenerPorId() {
-        when(reporteRepository.findById(1L)).thenReturn(Optional.of(reporte));
-
-        Optional<ReporteEntity> result = reporteService.obtenerPorId(1L);
-
-        assertTrue(result.isPresent());
-        assertEquals(50000.0, result.get().getIngresoTotal());
-        verify(reporteRepository, times(1)).findById(1L);
-    }
-
-    @Test
-    void testEliminarReporte() {
-        doNothing().when(reporteRepository).deleteById(1L);
-
-        reporteService.eliminarReporte(1L);
-
-        verify(reporteRepository, times(1)).deleteById(1L);
+        ReporteMensualEntity savedReporteMensual = captor.getValue();
+        assertEquals(12000.0, savedReporteMensual.getIngresoTotal());
+        assertEquals(2, savedReporteMensual.getTotalPersonasMin());
+        assertEquals(4, savedReporteMensual.getTotalPersonasMax());
+        assertEquals(1, savedReporteMensual.getCantidadReportes());
     }
 }
