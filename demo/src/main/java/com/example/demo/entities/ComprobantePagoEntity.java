@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 import jakarta.persistence.*;
 
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+
 
 
 @Entity
@@ -29,7 +29,7 @@ public class ComprobantePagoEntity {
         private ClienteEntity cliente;
 
         @ManyToOne(fetch = FetchType.LAZY)
-        @JoinColumn(name = "reserva_id", nullable = false)
+        @JoinColumn(name = "reserva_id", nullable = true)
         @JsonIgnoreProperties({"comprobante", "cliente", "hibernateLazyInitializer", "handler"})
         private ReservaEntity reserva;
 

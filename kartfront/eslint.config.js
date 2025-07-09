@@ -4,7 +4,19 @@ import reactHooks from 'eslint-plugin-react-hooks'
 import reactRefresh from 'eslint-plugin-react-refresh'
 
 export default [
-  { ignores: ['dist'] },
+  { 
+    ignores: [
+      'dist',
+      'build',
+      'node_modules',
+      'coverage',
+      'nginx',
+      'public',
+      '*.config.js',
+      'Dockerfile',
+      'Jenkinsfile'
+    ] 
+  },
   {
     files: ['**/*.{js,jsx}'],
     languageOptions: {
@@ -23,11 +35,50 @@ export default [
     rules: {
       ...js.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      
+      // Reglas específicas para el proyecto Karting
+      'no-unused-vars': ['error', { 
+        varsIgnorePattern: '^[A-Z_]',
+        argsIgnorePattern: '^_',
+        ignoreRestSiblings: true
+      }],
+      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      'no-debugger': 'error',
+      'no-alert': 'warn',
+      
+      // Reglas React específicas
       'react-refresh/only-export-components': [
         'warn',
         { allowConstantExport: true },
       ],
+      
+      // Reglas de estilo y calidad
+      'prefer-const': 'error',
+      'no-var': 'error',
+      'object-shorthand': 'error',
+      'prefer-arrow-callback': 'error',
+      
+      // Reglas para prevenir errores comunes
+      'no-implicit-coercion': 'warn',
+      'no-duplicate-imports': 'error',
+      'no-useless-return': 'error',
+      'no-useless-concat': 'error',
+      'no-useless-escape': 'error',
+      
+      // Reglas para mantener consistencia
+      'consistent-return': 'warn',
+      'default-case': 'warn',
+      'eqeqeq': ['error', 'always'],
+      'no-eval': 'error',
+      'no-implied-eval': 'error',
+      
+      // Reglas específicas para el manejo de estado React
+      'react-hooks/exhaustive-deps': 'warn'
     },
-  },
+    settings: {
+      react: {
+        version: 'detect'
+      }
+    }
+  }
 ]

@@ -16,8 +16,170 @@ function Reservar() {
     tiempoReserva: '',
     acompanantes: [],
   });
-
+  const [erroresFormulario, setErroresFormulario] = useState({});
   const [acompananteInput, setAcompananteInput] = useState('');
+
+  useEffect(() => {
+    cargarReservas();
+  }, []);
+
+  // Función para validar RUT
+  const esRutValido = (rut) => {
+    if (!rut || rut.trim() === '') return false;
+    
+    try {
+      const rutLimpio = limpiarRut(rut);
+      
+      if (rutLimpio.length < 2) return false;
+      
+      const numeroStr = rutLimpio.substring(0, rutLimpio.length - 1);
+      const digitoVerificador = rutLimpio.charAt(rutLimpio.length - 1);
+      
+      const numero = parseInt(numeroStr);
+      
+      if (numero < 1000000 || numero > 99999999) return false;
+      
+      const dvCalculado = calcularDigitoVerificador(numero);
+      
+      return digitoVerificador.toUpperCase() === dvCalculado.toUpperCase();
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const limpiarRut = (rut) => {
+    return rut.replace(/[.\-\s]/g, '').toUpperCase();
+  };
+
+  const calcularDigitoVerificador = (numero) => {
+    let suma = 0;
+    let multiplicador = 2;
+    
+    while (numero > 0) {
+      suma += (numero % 10) * multiplicador;
+      numero = Math.floor(numero / 10);
+      multiplicador = multiplicador === 7 ? 2 : multiplicador + 1;
+    }
+    
+    const resto = suma % 11;
+    const dv = 11 - resto;
+    
+    if (dv === 11) return '0';
+    if (dv === 10) return 'K';
+    return dv.toString();
+  };
+
+  // Función para validar fecha
+  const esFechaValida = (fecha) => {
+    if (!fecha) return false;
+    
+    const hoy = new Date();
+    const fechaSeleccionada = new Date(fecha);
+    
+    // Normalizar fechas para comparar solo día/mes/año
+    hoy.setHours(0, 0, 0, 0);
+    fechaSeleccionada.setHours(0, 0, 0, 0);
+    
+    return fechaSeleccionada >= hoy;
+  };
+
+  // Función para validar horas
+  const sonHorasValidas = (horaInicio, horaFin) => {
+    if (!horaInicio || !horaFin) return false;
+    
+    const inicio = new Date(`2000-01-01T${horaInicio}:00`);
+    const fin = new Date(`2000-01-01T${horaFin}:00`);
+    
+    return inicio < fin;
+  };
+
+  // Función para validar formulario completo
+  const validarFormulario = () => {
+    const errores = {};
+    
+    // Validar RUT
+    if (!nueva.cliente.rut.trim()) {
+      errores.rut = 'El RUT es obligatorio';
+    } else if (!esRutValido(nueva.cliente.rut)) {
+      errores.rut = 'Error en el ingreso del RUT. Formato válido: 12345678-9';
+    }
+    
+    // Validar fecha
+    if (!nueva.diaReserva) {
+      errores.diaReserva = 'La fecha es obligatoria';
+    } else if (!esFechaValida(nueva.diaReserva)) {
+      errores.diaReserva = 'Error en el ingreso del día';
+    }
+    
+    // Validar hora de inicio
+    if (!nueva.horaInicio) {
+      errores.horaInicio = 'La hora de inicio es obligatoria';
+    }
+    
+    // Validar hora de fin
+    if (!nueva.horaFin) {
+      errores.horaFin = 'La hora de fin es obligatoria';
+    }
+    
+    // Validar relación entre horas
+    if (nueva.horaInicio && nueva.horaFin) {
+      if (!sonHorasValidas(nueva.horaInicio, nueva.horaFin)) {
+        errores.horaInicio = 'La hora de inicio debe ser anterior a la hora de fin';
+        errores.horaFin = 'La hora de fin debe ser posterior a la hora de inicio';
+      }
+    }
+    
+    // Validar duración
+    if (!nueva.tiempoReserva || nueva.tiempoReserva <= 0) {
+      errores.tiempoReserva = 'La duración debe ser mayor a 0 minutos';
+    }
+    
+    return errores;
+  };
+
+  // Función para determinar si el botón debe estar habilitado
+  const esFormularioValido = () => {
+    return (
+      nueva.cliente.rut && 
+      nueva.diaReserva && 
+      nueva.horaInicio && 
+      nueva.horaFin && 
+      nueva.tiempoReserva &&
+      !Object.keys(erroresFormulario).some(key => erroresFormulario[key])
+    );
+  };
+
+  // Función para mostrar mensaje temporal
+  const mostrarMensajeTemporal = (texto, tipo) => {
+    setMensaje(texto);
+    setTipoMensaje(tipo);
+    setTimeout(() => {
+      setMensaje('');
+      setTipoMensaje('');
+    }, 5000);
+  };
+
+  // Función para manejar errores del backend
+  const manejarErrorBackend = (error) => {
+    if (error.response && error.response.data && error.response.data.message) {
+      const errorMessage = error.response.data.message;
+      
+      // Mapear errores específicos del backend
+      if (errorMessage.includes('Cliente no encontrado')) {
+        mostrarMensajeTemporal('Error: Cliente no encontrado. Verifique el RUT ingresado.', 'error');
+      } else if (errorMessage.includes('Debe especificar hora de inicio y fin')) {
+        mostrarMensajeTemporal('Error: Debe especificar hora de inicio y fin', 'error');
+      } else if (errorMessage.includes('La hora de inicio debe ser anterior a la hora de fin')) {
+        mostrarMensajeTemporal('Error: La hora de inicio debe ser anterior a la hora de fin', 'error');
+      } else if (errorMessage.includes('El horario seleccionado no está disponible')) {
+        mostrarMensajeTemporal('Error: El horario seleccionado no está disponible. Ya existe una reserva que se superpone con este horario.', 'error');
+      } else {
+        mostrarMensajeTemporal(`Error: ${errorMessage}`, 'error');
+      }
+    } else {
+      mostrarMensajeTemporal('Error al crear reserva. Intente nuevamente.', 'error');
+    }
+  };
 
   useEffect(() => {
     cargarReservas();
@@ -27,17 +189,24 @@ function Reservar() {
     reservaService.getAll()
       .then((res) => setReservas(res.data))
       .catch(() => {
-        setMensaje('Error al cargar reservas');
-        setTipoMensaje('error');
+        mostrarMensajeTemporal('Error al cargar reservas', 'error');
       });
   };
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    
     if (['rut'].includes(name)) {
       setNueva({ ...nueva, cliente: { ...nueva.cliente, rut: value } });
     } else {
       setNueva({ ...nueva, [name]: value });
+    }
+    
+    // Limpiar error específico cuando el usuario corrige
+    if (erroresFormulario[name]) {
+      const nuevosErrores = { ...erroresFormulario };
+      delete nuevosErrores[name];
+      setErroresFormulario(nuevosErrores);
     }
   };
 
@@ -58,10 +227,21 @@ function Reservar() {
 
   const crearReserva = (e) => {
     e.preventDefault();
+    
+    // Validar formulario antes de enviar
+    const errores = validarFormulario();
+    if (Object.keys(errores).length > 0) {
+      setErroresFormulario(errores);
+      mostrarMensajeTemporal('Por favor, corrija los errores en el formulario', 'error');
+      return;
+    }
+    
+    // Limpiar errores previos
+    setErroresFormulario({});
+    
     reservaService.create(nueva)
       .then(() => {
-        setMensaje('Reserva creada exitosamente');
-        setTipoMensaje('exito');
+        mostrarMensajeTemporal('Reserva creada exitosamente', 'exito');
         setNueva({
           cliente: { rut: '' },
           diaReserva: '',
@@ -70,25 +250,26 @@ function Reservar() {
           tiempoReserva: '',
           acompanantes: [],
         });
+        setErroresFormulario({}); // Asegurar que los errores se limpien
         cargarReservas();
       })
-      .catch(() => {
-        setMensaje('Error al crear reserva');
-        setTipoMensaje('error');
+      .catch((error) => {
+        // No establecer errores de formulario para errores del backend
+        // Solo mostrar el mensaje de error
+        setErroresFormulario({});
+        manejarErrorBackend(error);
       });
   };
 
   const eliminarReserva = (id) => {
     if (window.confirm('¿Eliminar esta reserva?')) {
-      reservaService.delete(id)
+      reservaService.remove(id)
         .then(() => {
-          setMensaje('Reserva eliminada exitosamente');
-          setTipoMensaje('exito');
+          mostrarMensajeTemporal('Reserva eliminada exitosamente', 'exito');
           cargarReservas();
         })
         .catch(() => {
-          setMensaje('Error al eliminar reserva');
-          setTipoMensaje('error');
+          mostrarMensajeTemporal('Error al eliminar reserva', 'error');
         });
     }
   };
@@ -269,14 +450,31 @@ function Reservar() {
       }}>
         <h3>Gestión de Reservas</h3>
 
+        {/* Mensajes de estado */}
         {mensaje && (
-          <p style={{
-            color: tipoMensaje === 'error' ? 'red' : 'green',
-            fontWeight: 'bold',
-            marginBottom: '20px'
+          <div style={{
+            backgroundColor: tipoMensaje === 'error' ? '#ffebee' : '#e8f5e8',
+            border: `1px solid ${tipoMensaje === 'error' ? '#f44336' : '#4CAF50'}`,
+            borderRadius: '4px',
+            padding: '12px',
+            marginBottom: '20px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px'
           }}>
-            {mensaje}
-          </p>
+            <span style={{ 
+              fontSize: '18px',
+              color: tipoMensaje === 'error' ? '#f44336' : '#4CAF50'
+            }}>
+              {tipoMensaje === 'error' ? '⚠️' : '✅'}
+            </span>
+            <span style={{
+              color: tipoMensaje === 'error' ? '#f44336' : '#4CAF50',
+              fontWeight: 'bold'
+            }}>
+              {mensaje}
+            </span>
+          </div>
         )}
 
         {/* Formulario de nueva reserva */}
@@ -294,8 +492,18 @@ function Reservar() {
                 value={nueva.cliente.rut} 
                 onChange={handleChange} 
                 required
-                style={{ padding: '8px', width: '140px' }}
+                style={{ 
+                  padding: '8px', 
+                  width: '140px',
+                  border: erroresFormulario.rut ? '2px solid #f44336' : '1px solid #ccc',
+                  borderRadius: '4px'
+                }}
               />
+              {erroresFormulario.rut && (
+                <small style={{ color: '#f44336', fontSize: '12px', marginTop: '2px' }}>
+                  {erroresFormulario.rut}
+                </small>
+              )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <label>Fecha</label>
@@ -305,8 +513,18 @@ function Reservar() {
                 value={nueva.diaReserva} 
                 onChange={handleChange} 
                 required
-                style={{ padding: '8px', width: '140px' }}
+                style={{ 
+                  padding: '8px', 
+                  width: '140px',
+                  border: erroresFormulario.diaReserva ? '2px solid #f44336' : '1px solid #ccc',
+                  borderRadius: '4px'
+                }}
               />
+              {erroresFormulario.diaReserva && (
+                <small style={{ color: '#f44336', fontSize: '12px', marginTop: '2px' }}>
+                  {erroresFormulario.diaReserva}
+                </small>
+              )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <label>Hora Inicio</label>
@@ -316,8 +534,18 @@ function Reservar() {
                 value={nueva.horaInicio} 
                 onChange={handleChange} 
                 required
-                style={{ padding: '8px', width: '140px' }}
+                style={{ 
+                  padding: '8px', 
+                  width: '140px',
+                  border: erroresFormulario.horaInicio ? '2px solid #f44336' : '1px solid #ccc',
+                  borderRadius: '4px'
+                }}
               />
+              {erroresFormulario.horaInicio && (
+                <small style={{ color: '#f44336', fontSize: '12px', marginTop: '2px' }}>
+                  {erroresFormulario.horaInicio}
+                </small>
+              )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <label>Hora Fin</label>
@@ -327,8 +555,18 @@ function Reservar() {
                 value={nueva.horaFin} 
                 onChange={handleChange} 
                 required
-                style={{ padding: '8px', width: '140px' }}
+                style={{ 
+                  padding: '8px', 
+                  width: '140px',
+                  border: erroresFormulario.horaFin ? '2px solid #f44336' : '1px solid #ccc',
+                  borderRadius: '4px'
+                }}
               />
+              {erroresFormulario.horaFin && (
+                <small style={{ color: '#f44336', fontSize: '12px', marginTop: '2px' }}>
+                  {erroresFormulario.horaFin}
+                </small>
+              )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <label>Duración (min)</label>
@@ -339,8 +577,18 @@ function Reservar() {
                 value={nueva.tiempoReserva} 
                 onChange={handleChange} 
                 required
-                style={{ padding: '8px', width: '120px' }}
+                style={{ 
+                  padding: '8px', 
+                  width: '120px',
+                  border: erroresFormulario.tiempoReserva ? '2px solid #f44336' : '1px solid #ccc',
+                  borderRadius: '4px'
+                }}
               />
+              {erroresFormulario.tiempoReserva && (
+                <small style={{ color: '#f44336', fontSize: '12px', marginTop: '2px' }}>
+                  {erroresFormulario.tiempoReserva}
+                </small>
+              )}
             </div>
           </div>
 
@@ -423,15 +671,17 @@ function Reservar() {
 
           <button 
             type="submit" 
+            disabled={!esFormularioValido()}
             style={{
-              backgroundColor: '#4CAF50',
+              backgroundColor: esFormularioValido() ? '#4CAF50' : '#ccc',
               color: 'white',
               border: 'none',
               padding: '12px 24px',
               borderRadius: '4px',
-              cursor: 'pointer',
+              cursor: esFormularioValido() ? 'pointer' : 'not-allowed',
               fontSize: '16px',
-              fontWeight: 'bold'
+              fontWeight: 'bold',
+              opacity: esFormularioValido() ? 1 : 0.6
             }}
           >
             Crear Reserva

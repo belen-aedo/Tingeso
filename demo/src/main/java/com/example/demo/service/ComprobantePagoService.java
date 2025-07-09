@@ -12,6 +12,8 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import jakarta.mail.util.ByteArrayDataSource;
@@ -23,12 +25,46 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
 @Service
 public class ComprobantePagoService {
+
+    // Excepciones personalizadas
+    public static class ComprobanteException extends Exception {
+        public ComprobanteException(String message) {
+            super(message);
+        }
+
+        public ComprobanteException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
+
+    public static class ReservaException extends Exception {
+        public ReservaException(String message) {
+            super(message);
+        }
+
+        public ReservaException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
+
+    public static class EmailException extends Exception {
+        public EmailException(String message) {
+            super(message);
+        }
+
+        public EmailException(String message, Throwable cause) {
+            super(message, cause);
+        }
+    }
+
+    private static final Logger logger = LoggerFactory.getLogger(ComprobantePagoService.class);
+    private static final BigDecimal IVA_RATE = new BigDecimal("0.19");
+    private static final DateTimeFormatter DATE_FORMAT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     private final ComprobantePagoRepository comprobantePagoRepository;
     private final ClienteService clienteService;
@@ -36,13 +72,11 @@ public class ComprobantePagoService {
     private final TarifaService tarifaService;
     private final JavaMailSender mailSender;
 
-    private static final BigDecimal IVA_RATE = new BigDecimal("0.19");
-
     @Autowired
     public ComprobantePagoService(
             ComprobantePagoRepository comprobantePagoRepository,
             ClienteService clienteService,
-            @Lazy ReservaService reservaService,  // Agregar @Lazy aquí
+            @Lazy ReservaService reservaService,
             TarifaService tarifaService,
             JavaMailSender mailSender) {
         this.comprobantePagoRepository = comprobantePagoRepository;
@@ -54,6 +88,10 @@ public class ComprobantePagoService {
 
     public List<ComprobantePagoEntity> getAllComprobantes() {
         return comprobantePagoRepository.findAll();
+    }
+
+    public void eliminarComprobante(Long idComprobante) {
+        comprobantePagoRepository.deleteById(idComprobante);
     }
 
     public Optional<ComprobantePagoEntity> getComprobanteById(Long id) {
@@ -69,91 +107,92 @@ public class ComprobantePagoService {
     }
 
     @Transactional
-    public ComprobantePagoEntity generarComprobantePago(Long reservaId) {
+    public ComprobantePagoEntity generarComprobantePago(Long reservaId) throws ComprobanteException {
         try {
             // Verificar si ya existe un comprobante para esta reserva
             Optional<ComprobantePagoEntity> comprobanteExistente = getComprobanteByReservaId(reservaId);
             if (comprobanteExistente.isPresent()) {
-                System.out.println("Ya existe un comprobante para la reserva ID: " + reservaId);
+                logger.info("Ya existe un comprobante para la reserva ID: {}", reservaId);
                 return comprobanteExistente.get();
             }
 
-            // Obtener la reserva
-            Optional<ReservaEntity> optReserva = reservaService.obtenerReservaPorId(reservaId);
-            if (optReserva.isEmpty()) {
-                throw new RuntimeException("No se encontró la reserva con ID: " + reservaId);
-            }
+            return crearNuevoComprobante(reservaId);
 
-            ReservaEntity reserva = optReserva.get();
-            ClienteEntity cliente = reserva.getCliente();
 
-            if (cliente == null) {
-                throw new RuntimeException("La reserva no tiene cliente asociado");
-            }
-
-            // Buscar la tarifa según el tiempo de reserva
-            Long tarifaId = obtenerTarifaIdPorTiempoReserva(reserva.getTiempoReserva());
-            Optional<TarifaEntity> optTarifa = tarifaService.getTarifaById(tarifaId);
-            if (optTarifa.isEmpty()) {
-                throw new RuntimeException("No se encontró una tarifa para el tiempo de reserva: " +
-                        reserva.getTiempoReserva() + " minutos");
-            }
-
-            TarifaEntity tarifa = optTarifa.get();
-
-            // Calcular número total de personas
-            int totalPersonas = calcularTotalPersonas(reserva);
-            System.out.println("Total personas: " + totalPersonas);
-
-            // Calcular el monto base
-            BigDecimal precioBase = new BigDecimal(tarifa.getPrecioBase());
-            BigDecimal montoBase = precioBase.multiply(new BigDecimal(totalPersonas));
-            System.out.println("Monto base: " + montoBase);
-
-            // Calcular descuentos
-            BigDecimal descuentoGrupo = calcularDescuentoGrupo(totalPersonas, montoBase);
-            BigDecimal descuentoClienteFrecuente = calcularDescuentoClienteFrecuente(cliente,
-                    reserva.getAcompanantes(), montoBase);
-            BigDecimal descuentoCumpleanos = calcularDescuentoCumpleanos(cliente,
-                    reserva.getAcompanantes(), totalPersonas, reserva.getDiaReserva(), montoBase);
-
-            System.out.println("Descuento grupo: " + descuentoGrupo);
-            System.out.println("Descuento cliente frecuente: " + descuentoClienteFrecuente);
-            System.out.println("Descuento cumpleaños: " + descuentoCumpleanos);
-
-            // Calcular totales
-            BigDecimal descuentoTotal = descuentoGrupo.add(descuentoClienteFrecuente).add(descuentoCumpleanos);
-            BigDecimal montoFinal = montoBase.subtract(descuentoTotal);
-            if (montoFinal.compareTo(BigDecimal.ZERO) < 0) {
-                montoFinal = BigDecimal.ZERO;
-            }
-
-            BigDecimal iva = montoFinal.multiply(IVA_RATE).setScale(0, RoundingMode.HALF_UP);
-            BigDecimal montoTotalConIva = montoFinal.add(iva);
-
-            // Crear y guardar el comprobante
-            ComprobantePagoEntity comprobante = new ComprobantePagoEntity();
-            comprobante.setCliente(cliente);
-            comprobante.setReserva(reserva);
-            comprobante.setTarifa(tarifa);
-            comprobante.setDescuentoGrupo(descuentoGrupo);
-            comprobante.setDescuentoClienteFrecuente(descuentoClienteFrecuente);
-            comprobante.setDescuentoCumpleanos(descuentoCumpleanos);
-            comprobante.setMontoBase(montoBase);
-            comprobante.setMontoFinal(montoFinal);
-            comprobante.setIva(iva);
-            comprobante.setMontoTotalConIva(montoTotalConIva);
-
-            ComprobantePagoEntity comprobanteGuardado = comprobantePagoRepository.save(comprobante);
-            System.out.println("Comprobante guardado exitosamente con ID: " + comprobanteGuardado.getId());
-
-            return comprobanteGuardado;
-
+        } catch (ReservaException e) {
+            throw new ComprobanteException("Error al generar comprobante para reserva: " + e.getMessage(), e);
         } catch (Exception e) {
-            System.err.println("Error al generar comprobante: " + e.getMessage());
-            e.printStackTrace();
-            throw new RuntimeException("Error al generar comprobante: " + e.getMessage(), e);
+            throw new ComprobanteException("Error inesperado al generar comprobante: " + e.getMessage(), e);
         }
+    }
+
+    private ComprobantePagoEntity crearNuevoComprobante(Long reservaId) throws ReservaException {
+        // Obtener la reserva
+        Optional<ReservaEntity> optReserva = reservaService.obtenerReservaPorId(reservaId);
+        if (optReserva.isEmpty()) {
+            throw new ReservaException("No se encontró la reserva con ID: " + reservaId);
+        }
+
+        ReservaEntity reserva = optReserva.get();
+        ClienteEntity cliente = reserva.getCliente();
+
+        if (cliente == null) {
+            throw new ReservaException("La reserva no tiene cliente asociado");
+        }
+
+        TarifaEntity tarifa = obtenerTarifa(reserva.getTiempoReserva());
+        return procesarComprobante(reserva, cliente, tarifa);
+    }
+
+    private TarifaEntity obtenerTarifa(int tiempoReserva) throws ReservaException {
+        Long tarifaId = obtenerTarifaIdPorTiempoReserva(tiempoReserva);
+        Optional<TarifaEntity> optTarifa = tarifaService.getTarifaById(tarifaId);
+        if (optTarifa.isEmpty()) {
+            throw new ReservaException("No se encontró una tarifa para el tiempo de reserva: " +
+                    tiempoReserva + " minutos");
+        }
+        return optTarifa.get();
+    }
+
+    private ComprobantePagoEntity procesarComprobante(ReservaEntity reserva, ClienteEntity cliente, TarifaEntity tarifa) {
+        // Calcular número total de personas
+        int totalPersonas = calcularTotalPersonas(reserva);
+
+        // Calcular el monto base
+        BigDecimal precioBase = new BigDecimal(tarifa.getPrecioBase());
+        BigDecimal montoBase = precioBase.multiply(new BigDecimal(totalPersonas));
+
+        // Calcular descuentos
+        BigDecimal descuentoGrupo = calcularDescuentoGrupo(totalPersonas, montoBase);
+        BigDecimal descuentoCumpleanos = calcularDescuentoCumpleanos();
+
+        // Calcular totales
+        BigDecimal descuentoTotal = descuentoGrupo
+                .add(calcularDescuentoClienteFrecuente(montoBase))
+                .add(descuentoCumpleanos)
+                .setScale(0, RoundingMode.HALF_UP);
+        BigDecimal montoFinal = montoBase.subtract(descuentoTotal);
+        if (montoFinal.compareTo(BigDecimal.ZERO) < 0) {
+            montoFinal = BigDecimal.ZERO;
+        }
+
+        BigDecimal iva = montoFinal.multiply(IVA_RATE).setScale(0, RoundingMode.HALF_UP);
+        BigDecimal montoTotalConIva = montoFinal.add(iva);
+
+        // Crear y guardar el comprobante
+        ComprobantePagoEntity comprobante = new ComprobantePagoEntity();
+        comprobante.setCliente(cliente);
+        comprobante.setReserva(reserva);
+        comprobante.setTarifa(tarifa);
+        comprobante.setDescuentoGrupo(descuentoGrupo);
+        comprobante.setDescuentoClienteFrecuente(calcularDescuentoClienteFrecuente(montoBase));
+        comprobante.setDescuentoCumpleanos(descuentoCumpleanos);
+        comprobante.setMontoBase(montoBase);
+        comprobante.setMontoFinal(montoFinal);
+        comprobante.setIva(iva);
+        comprobante.setMontoTotalConIva(montoTotalConIva);
+
+        return comprobantePagoRepository.save(comprobante);
     }
 
     private int calcularTotalPersonas(ReservaEntity reserva) {
@@ -188,177 +227,136 @@ public class ComprobantePagoService {
         return montoBase.multiply(porcentajeDescuento).setScale(0, RoundingMode.HALF_UP);
     }
 
-    private BigDecimal calcularDescuentoClienteFrecuente(ClienteEntity cliente, List<String> acompanantesRut,
-                                                         BigDecimal montoBase) {
+    private BigDecimal calcularDescuentoClienteFrecuente(BigDecimal montoBase) {
         BigDecimal porcentajeDescuentoTotal = BigDecimal.ZERO;
 
+        return procesarDescuentoClienteFrecuente( montoBase, porcentajeDescuentoTotal);
+    }
+
+    private BigDecimal procesarDescuentoClienteFrecuente(BigDecimal montoBase, BigDecimal porcentajeDescuentoTotal) {
         try {
             // Descuento del cliente principal
+            // Aquí se puede agregar lógica para el descuento del cliente
 
-            // Descuentos de los acompañantes
-            if (acompanantesRut != null && !acompanantesRut.isEmpty()) {
-                for (String rutAcompanante : acompanantesRut) {
-                    try {
-                        Optional<ClienteEntity> optAcompanante = clienteService.getClienteById(rutAcompanante);
-                        if (optAcompanante.isPresent()) {
-                            ClienteEntity acompanante = optAcompanante.get();
-                        }
-                    } catch (Exception e) {
-                        System.err.println("Error obteniendo acompañante " + rutAcompanante + ": " + e.getMessage());
-                    }
-                }
-            }
+
 
             return montoBase.multiply(porcentajeDescuentoTotal).setScale(0, RoundingMode.HALF_UP);
         } catch (Exception e) {
-            System.err.println("Error calculando descuento cliente frecuente: " + e.getMessage());
+            logger.error("Error calculando descuento cliente frecuente: {}", e.getMessage());
             return BigDecimal.ZERO;
         }
     }
 
-    private BigDecimal calcularDescuentoCumpleanos(ClienteEntity cliente, List<String> acompanantesRut,
-                                                   int totalPersonas, LocalDate diaReserva, BigDecimal montoBase) {
-        try {
-            int maxCumpleanerosBeneficiados = 0;
 
-            if (totalPersonas >= 3 && totalPersonas <= 5) {
-                maxCumpleanerosBeneficiados = 1;
-            } else if (totalPersonas >= 6 && totalPersonas <= 10) {
-                maxCumpleanerosBeneficiados = 2;
-            }
 
-            if (maxCumpleanerosBeneficiados <= 0) {
-                return BigDecimal.ZERO;
-            }
 
-            List<ClienteEntity> cumpleaneros = new ArrayList<>();
 
-            // Verificar cliente principal
-            if (esCumpleanos(cliente, diaReserva)) {
-                cumpleaneros.add(cliente);
-            }
-
-            // Verificar acompañantes
-            if (acompanantesRut != null && !acompanantesRut.isEmpty()) {
-                for (String rutAcompanante : acompanantesRut) {
-                    if (cumpleaneros.size() >= maxCumpleanerosBeneficiados) {
-                        break;
-                    }
-                    try {
-                        Optional<ClienteEntity> optAcompanante = clienteService.getClienteById(rutAcompanante);
-                        if (optAcompanante.isPresent() && esCumpleanos(optAcompanante.get(), diaReserva)) {
-                            cumpleaneros.add(optAcompanante.get());
-                        }
-                    } catch (Exception e) {
-                        System.err.println("Error verificando cumpleaños de acompañante " + rutAcompanante + ": " + e.getMessage());
-                    }
-                }
-            }
-
-            // Calcular descuento (50% por cada cumpleañero)
-            BigDecimal descuentoPorCumpleanero = montoBase.multiply(new BigDecimal("0.50"))
-                    .setScale(0, RoundingMode.HALF_UP);
-
-            return descuentoPorCumpleanero.multiply(new BigDecimal(cumpleaneros.size()));
-
-        } catch (Exception e) {
-            System.err.println("Error calculando descuento cumpleaños: " + e.getMessage());
-            return BigDecimal.ZERO;
-        }
+    private BigDecimal calcularDescuentoCumpleanos() {
+        return BigDecimal.ZERO;
     }
 
-    private boolean esCumpleanos(ClienteEntity cliente, LocalDate diaReserva) {
-        try {
-            if (cliente.getFechaCumple() == null) {
-                return false;
-            }
 
-            return cliente.getFechaCumple().getDayOfMonth() == diaReserva.getDayOfMonth() &&
-                    cliente.getFechaCumple().getMonthValue() == diaReserva.getMonthValue();
-        } catch (Exception e) {
-            System.err.println("Error verificando cumpleaños: " + e.getMessage());
-            return false;
-        }
-    }
 
     @Transactional
-    public void enviarComprobantePorEmail(Long comprobanteId) {
+    public void enviarComprobantePorEmail(Long comprobanteId) throws EmailException {
+        ComprobantePagoEntity comprobante = obtenerComprobante(comprobanteId);
+        ReservaEntity reserva = comprobante.getReserva();
+        ClienteEntity cliente = comprobante.getCliente();
+
+        validarEmailCliente(cliente);
+
         try {
-            Optional<ComprobantePagoEntity> optComprobante = comprobantePagoRepository.findById(comprobanteId);
-            if (optComprobante.isEmpty()) {
-                throw new RuntimeException("No se encontró el comprobante con ID: " + comprobanteId);
-            }
-
-            ComprobantePagoEntity comprobante = optComprobante.get();
-            ReservaEntity reserva = comprobante.getReserva();
-            ClienteEntity cliente = comprobante.getCliente();
-
-            if (cliente.getEmail() == null || cliente.getEmail().trim().isEmpty()) {
-                throw new RuntimeException("El cliente no tiene email registrado");
-            }
-
             // Generar el PDF
             byte[] pdfBytes = generarPDF(comprobante);
 
             // Enviar email al cliente principal
-            String mensajeCliente = String.format(
-                    "Estimado/a %s,\n\n" +
-                            "Adjunto encontrará el comprobante de pago para su reserva en KartingRM.\n\n" +
-                            "Código de reserva: %s\n" +
-                            "Fecha: %s\n" +
-                            "Hora: %s - %s\n\n" +
-                            "Recuerde presentar este comprobante el día de su visita.\n\n" +
-                            "Saludos cordiales,\n" +
-                            "Equipo KartingRM",
-                    cliente.getNombre(),
-                    reserva.getIdReserva(),
-                    reserva.getDiaReserva().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
-                    reserva.getHoraInicio(),
-                    reserva.getHoraFin()
-            );
-
-            enviarEmail(cliente.getEmail(), "Comprobante de Pago - KartingRM", mensajeCliente, pdfBytes);
+            enviarEmailCliente(cliente, reserva, pdfBytes);
 
             // Enviar emails a los acompañantes
-            if (reserva.getAcompanantes() != null && !reserva.getAcompanantes().isEmpty()) {
-                for (String rutAcompanante : reserva.getAcompanantes()) {
-                    try {
-                        Optional<ClienteEntity> optAcompanante = clienteService.getClienteById(rutAcompanante);
-                        if (optAcompanante.isPresent()) {
-                            ClienteEntity acompanante = optAcompanante.get();
-                            if (acompanante.getEmail() != null && !acompanante.getEmail().trim().isEmpty()) {
-                                String mensajeAcompanante = String.format(
-                                        "Estimado/a %s,\n\n" +
-                                                "Adjunto encontrará el comprobante de pago para la reserva en KartingRM donde usted es acompañante.\n\n" +
-                                                "Reserva realizada por: %s\n" +
-                                                "Código de reserva: %s\n" +
-                                                "Fecha: %s\n" +
-                                                "Hora: %s - %s\n\n" +
-                                                "Recuerde presentar este comprobante el día de su visita.\n\n" +
-                                                "Saludos cordiales,\n" +
-                                                "Equipo KartingRM",
-                                        acompanante.getNombre(),
-                                        cliente.getNombre(),
-                                        reserva.getIdReserva(),
-                                        reserva.getDiaReserva().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
-                                        reserva.getHoraInicio(),
-                                        reserva.getHoraFin()
-                                );
+            enviarEmailsAcompanantes(reserva, cliente, pdfBytes);
 
-                                enviarEmail(acompanante.getEmail(), "Comprobante de Pago - KartingRM", mensajeAcompanante, pdfBytes);
-                            }
-                        }
-                    } catch (Exception e) {
-                        System.err.println("Error enviando email a acompañante " + rutAcompanante + ": " + e.getMessage());
-                    }
+        } catch (IOException e) {
+            throw new EmailException("Error al generar PDF: " + e.getMessage(), e);
+        } catch (MessagingException e) {
+            throw new EmailException("Error al enviar email: " + e.getMessage(), e);
+        }
+    }
+
+    private ComprobantePagoEntity obtenerComprobante(Long comprobanteId) throws EmailException {
+        Optional<ComprobantePagoEntity> optComprobante = comprobantePagoRepository.findById(comprobanteId);
+        if (optComprobante.isEmpty()) {
+            throw new EmailException("No se encontró el comprobante con ID: " + comprobanteId);
+        }
+        return optComprobante.get();
+    }
+
+    private void validarEmailCliente(ClienteEntity cliente) throws EmailException {
+        if (cliente.getEmail() == null || cliente.getEmail().trim().isEmpty()) {
+            throw new EmailException("El cliente no tiene email registrado");
+        }
+    }
+
+    private void enviarEmailCliente(ClienteEntity cliente, ReservaEntity reserva, byte[] pdfBytes) throws MessagingException {
+        String mensajeCliente = String.format(
+                "Estimado/a %s,%n%n" +
+                        "Adjunto encontrará el comprobante de pago para su reserva en KartingRM.%n%n" +
+                        "Código de reserva: %s%n" +
+                        "Fecha: %s%n" +
+                        "Hora: %s - %s%n%n" +
+                        "Recuerde presentar este comprobante el día de su visita.%n%n" +
+                        "Saludos cordiales,%n" +
+                        "Equipo KartingRM",
+                cliente.getNombre(),
+                reserva.getIdReserva(),
+                reserva.getDiaReserva().format(DATE_FORMAT),
+                reserva.getHoraInicio(),
+                reserva.getHoraFin()
+        );
+
+        enviarEmail(cliente.getEmail(), "Comprobante de Pago - KartingRM", mensajeCliente, pdfBytes);
+    }
+
+    private void enviarEmailsAcompanantes(ReservaEntity reserva, ClienteEntity cliente, byte[] pdfBytes) {
+        if (reserva.getAcompanantes() != null && !reserva.getAcompanantes().isEmpty()) {
+            for (String rutAcompanante : reserva.getAcompanantes()) {
+                enviarEmailAcompanante(rutAcompanante, cliente, reserva, pdfBytes);
+            }
+        }
+    }
+
+    private void enviarEmailAcompanante(String rutAcompanante, ClienteEntity cliente, ReservaEntity reserva, byte[] pdfBytes) {
+        try {
+            Optional<ClienteEntity> optAcompanante = clienteService.getClienteById(rutAcompanante);
+            if (optAcompanante.isPresent()) {
+                ClienteEntity acompanante = optAcompanante.get();
+                if (acompanante.getEmail() != null && !acompanante.getEmail().trim().isEmpty()) {
+                    String mensajeAcompanante = crearMensajeAcompanante(acompanante, cliente, reserva);
+                    enviarEmail(acompanante.getEmail(), "Comprobante de Pago - KartingRM", mensajeAcompanante, pdfBytes);
                 }
             }
-
         } catch (Exception e) {
-            System.err.println("Error al enviar el comprobante por email: " + e.getMessage());
-            e.printStackTrace();
-            throw new RuntimeException("Error al enviar el comprobante por email: " + e.getMessage(), e);
+            logger.error("Error enviando email a acompañante {}: {}", rutAcompanante, e.getMessage());
         }
+    }
+
+    private String crearMensajeAcompanante(ClienteEntity acompanante, ClienteEntity cliente, ReservaEntity reserva) {
+        return String.format(
+                "Estimado/a %s,%n%n" +
+                        "Adjunto encontrará el comprobante de pago para la reserva en KartingRM donde usted es acompañante.%n%n" +
+                        "Reserva realizada por: %s%n" +
+                        "Código de reserva: %s%n" +
+                        "Fecha: %s%n" +
+                        "Hora: %s - %s%n%n" +
+                        "Recuerde presentar este comprobante el día de su visita.%n%n" +
+                        "Saludos cordiales,%n" +
+                        "Equipo KartingRM",
+                acompanante.getNombre(),
+                cliente.getNombre(),
+                reserva.getIdReserva(),
+                reserva.getDiaReserva().format(DATE_FORMAT),
+                reserva.getHoraInicio(),
+                reserva.getHoraFin()
+        );
     }
 
     private byte[] generarPDF(ComprobantePagoEntity comprobante) throws IOException {
@@ -367,242 +365,198 @@ public class ComprobantePagoService {
             document.addPage(page);
 
             try (PDPageContentStream contentStream = new PDPageContentStream(document, page)) {
-                float margin = 50;
-                float yPosition = 750;
-
-                // Título
-                contentStream.setFont(PDType1Font.HELVETICA_BOLD, 20);
-                contentStream.beginText();
-                contentStream.newLineAtOffset(margin, yPosition);
-                contentStream.showText("COMPROBANTE DE PAGO - KARTINGRM");
-                contentStream.endText();
-                yPosition -= 40;
-
-                // Línea separadora
-                contentStream.moveTo(margin, yPosition);
-                contentStream.lineTo(545, yPosition);
-                contentStream.stroke();
-                yPosition -= 30;
-
-                // Información de la reserva
-                contentStream.setFont(PDType1Font.HELVETICA_BOLD, 14);
-                contentStream.beginText();
-                contentStream.newLineAtOffset(margin, yPosition);
-                contentStream.showText("INFORMACION DE LA RESERVA");
-                contentStream.endText();
-                yPosition -= 25;
-
-                contentStream.setFont(PDType1Font.HELVETICA, 12);
-
-                String[] infoReserva = {
-                        "Codigo de reserva: " + comprobante.getReserva().getIdReserva(),
-                        "Fecha: " + comprobante.getReserva().getDiaReserva().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")),
-                        "Hora: " + comprobante.getReserva().getHoraInicio() + " - " + comprobante.getReserva().getHoraFin(),
-                        "Numero de vueltas: " + comprobante.getTarifa().getNumeroVueltas() + " (max " + comprobante.getTarifa().getTiempoMaximo() + " min)"
-                };
-
-                for (String info : infoReserva) {
-                    contentStream.beginText();
-                    contentStream.newLineAtOffset(margin, yPosition);
-                    contentStream.showText(info);
-                    contentStream.endText();
-                    yPosition -= 20;
-                }
-
-                yPosition -= 10;
-
-                // Información del cliente
-                contentStream.setFont(PDType1Font.HELVETICA_BOLD, 14);
-                contentStream.beginText();
-                contentStream.newLineAtOffset(margin, yPosition);
-                contentStream.showText("INFORMACION DEL CLIENTE");
-                contentStream.endText();
-                yPosition -= 25;
-
-                contentStream.setFont(PDType1Font.HELVETICA, 12);
-
-                int totalPersonas = calcularTotalPersonas(comprobante.getReserva());
-
-                String[] infoCliente = {
-                        "Reservado por: " + comprobante.getCliente().getNombre(),
-                        "RUT: " + comprobante.getCliente().getRut(),
-                        "Email: " + comprobante.getCliente().getEmail(),
-                        "Cantidad de personas: " + totalPersonas
-                };
-
-                for (String info : infoCliente) {
-                    contentStream.beginText();
-                    contentStream.newLineAtOffset(margin, yPosition);
-                    contentStream.showText(info);
-                    contentStream.endText();
-                    yPosition -= 20;
-                }
-
-                yPosition -= 30;
-
-                // Detalle de costos
-                contentStream.setFont(PDType1Font.HELVETICA_BOLD, 14);
-                contentStream.beginText();
-                contentStream.newLineAtOffset(margin, yPosition);
-                contentStream.showText("DETALLE DE COSTOS");
-                contentStream.endText();
-                yPosition -= 25;
-
-                contentStream.setFont(PDType1Font.HELVETICA, 12);
-
-                String[][] costos = {
-                        {"Monto Base:", "$" + comprobante.getMontoBase().toString()},
-                        {"Descuento Grupo:", "-$" + comprobante.getDescuentoGrupo().toString()},
-                        {"Descuento Cliente Frecuente:", "-$" + comprobante.getDescuentoClienteFrecuente().toString()},
-                        {"Descuento Cumpleanos:", "-$" + comprobante.getDescuentoCumpleanos().toString()},
-                        {"Subtotal:", "$" + comprobante.getMontoFinal().toString()},
-                        {"IVA (19%):", "$" + comprobante.getIva().toString()}
-                };
-
-                for (String[] costo : costos) {
-                    contentStream.beginText();
-                    contentStream.newLineAtOffset(margin, yPosition);
-                    contentStream.showText(costo[0]);
-                    contentStream.endText();
-
-                    contentStream.beginText();
-                    contentStream.newLineAtOffset(400, yPosition);
-                    contentStream.showText(costo[1]);
-                    contentStream.endText();
-                    yPosition -= 20;
-                }
-
-                yPosition -= 10;
-
-                // Total final
-                contentStream.setFont(PDType1Font.HELVETICA_BOLD, 14);
-                contentStream.beginText();
-                contentStream.newLineAtOffset(margin, yPosition);
-                contentStream.showText("TOTAL A PAGAR:");
-                contentStream.endText();
-
-                contentStream.beginText();
-                contentStream.newLineAtOffset(400, yPosition);
-                contentStream.showText("$" + comprobante.getMontoTotalConIva().toString());
-                contentStream.endText();
-                yPosition -= 40;
-
-                // Línea separadora
-                contentStream.moveTo(margin, yPosition);
-                contentStream.lineTo(545, yPosition);
-                contentStream.stroke();
-                yPosition -= 30;
-
-                // Pie del documento
-                contentStream.setFont(PDType1Font.HELVETICA, 10);
-                contentStream.beginText();
-                contentStream.newLineAtOffset(margin, yPosition);
-                contentStream.showText("Este comprobante debe ser presentado el dia de su visita a KartingRM");
-                contentStream.endText();
-                yPosition -= 15;
-
-                contentStream.beginText();
-                contentStream.newLineAtOffset(margin, yPosition);
-                contentStream.showText("Generado el: " + LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")));
-                contentStream.endText();
+                generarContenidoPDF(contentStream, comprobante);
             }
 
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            document.save(baos);
-            return baos.toByteArray();
+            return convertirPDFAByteArray(document);
         }
+    }
+
+    private void generarContenidoPDF(PDPageContentStream contentStream, ComprobantePagoEntity comprobante) throws IOException {
+        float margin = 50;
+        float yPosition = 750;
+
+        yPosition = escribirTitulo(contentStream, margin, yPosition);
+        yPosition = escribirInformacionReserva(contentStream, comprobante, margin, yPosition);
+        yPosition = escribirInformacionCliente(contentStream, comprobante, margin, yPosition);
+        yPosition = escribirDetalleCostos(contentStream, comprobante, margin, yPosition);
+        yPosition = escribirTotalFinal(contentStream, comprobante, margin, yPosition);
+        escribirPieDocumento(contentStream, margin, yPosition);
+    }
+
+    private float escribirTitulo(PDPageContentStream contentStream, float margin, float yPosition) throws IOException {
+        contentStream.setFont(PDType1Font.HELVETICA_BOLD, 20);
+        contentStream.beginText();
+        contentStream.newLineAtOffset(margin, yPosition);
+        contentStream.showText("COMPROBANTE DE PAGO - KARTINGRM");
+        contentStream.endText();
+        yPosition -= 40;
+
+        // Línea separadora
+        contentStream.moveTo(margin, yPosition);
+        contentStream.lineTo(545, yPosition);
+        contentStream.stroke();
+        yPosition -= 30;
+
+        return yPosition;
+    }
+
+    private float escribirInformacionReserva(PDPageContentStream contentStream, ComprobantePagoEntity comprobante, float margin, float yPosition) throws IOException {
+        contentStream.setFont(PDType1Font.HELVETICA_BOLD, 14);
+        contentStream.beginText();
+        contentStream.newLineAtOffset(margin, yPosition);
+        contentStream.showText("INFORMACION DE LA RESERVA");
+        contentStream.endText();
+        yPosition -= 25;
+
+        contentStream.setFont(PDType1Font.HELVETICA, 12);
+
+        String[] infoReserva = {
+                "Codigo de reserva: " + comprobante.getReserva().getIdReserva(),
+                "Fecha: " + comprobante.getReserva().getDiaReserva().format(DATE_FORMAT),
+                "Hora: " + comprobante.getReserva().getHoraInicio() + " - " + comprobante.getReserva().getHoraFin(),
+                "Numero de vueltas: " + comprobante.getTarifa().getNumeroVueltas() + " (max " + comprobante.getTarifa().getTiempoMaximo() + " min)"
+        };
+
+        for (String info : infoReserva) {
+            contentStream.beginText();
+            contentStream.newLineAtOffset(margin, yPosition);
+            contentStream.showText(info);
+            contentStream.endText();
+            yPosition -= 20;
+        }
+
+        return yPosition - 10;
+    }
+
+    private float escribirInformacionCliente(PDPageContentStream contentStream, ComprobantePagoEntity comprobante, float margin, float yPosition) throws IOException {
+        contentStream.setFont(PDType1Font.HELVETICA_BOLD, 14);
+        contentStream.beginText();
+        contentStream.newLineAtOffset(margin, yPosition);
+        contentStream.showText("INFORMACION DEL CLIENTE");
+        contentStream.endText();
+        yPosition -= 25;
+
+        contentStream.setFont(PDType1Font.HELVETICA, 12);
+
+        int totalPersonas = calcularTotalPersonas(comprobante.getReserva());
+
+        String[] infoCliente = {
+                "Reservado por: " + comprobante.getCliente().getNombre(),
+                "RUT: " + comprobante.getCliente().getRut(),
+                "Email: " + comprobante.getCliente().getEmail(),
+                "Cantidad de personas: " + totalPersonas
+        };
+
+        for (String info : infoCliente) {
+            contentStream.beginText();
+            contentStream.newLineAtOffset(margin, yPosition);
+            contentStream.showText(info);
+            contentStream.endText();
+            yPosition -= 20;
+        }
+
+        return yPosition - 30;
+    }
+
+    private float escribirDetalleCostos(PDPageContentStream contentStream, ComprobantePagoEntity comprobante, float margin, float yPosition) throws IOException {
+        contentStream.setFont(PDType1Font.HELVETICA_BOLD, 14);
+        contentStream.beginText();
+        contentStream.newLineAtOffset(margin, yPosition);
+        contentStream.showText("DETALLE DE COSTOS");
+        contentStream.endText();
+        yPosition -= 25;
+
+        contentStream.setFont(PDType1Font.HELVETICA, 12);
+
+        String[][] costos = {
+                {"Monto Base:", "$" + comprobante.getMontoBase().toString()},
+                {"Descuento Grupo:", "-$" + comprobante.getDescuentoGrupo().toString()},
+                {"Descuento Cliente Frecuente:", "-$" + comprobante.getDescuentoClienteFrecuente().toString()},
+                {"Descuento Cumpleanos:", "-$" + comprobante.getDescuentoCumpleanos().toString()},
+                {"Subtotal:", "$" + comprobante.getMontoFinal().toString()},
+                {"IVA (19%):", "$" + comprobante.getIva().toString()}
+        };
+
+        for (String[] costo : costos) {
+            contentStream.beginText();
+            contentStream.newLineAtOffset(margin, yPosition);
+            contentStream.showText(costo[0]);
+            contentStream.endText();
+
+            contentStream.beginText();
+            contentStream.newLineAtOffset(400, yPosition);
+            contentStream.showText(costo[1]);
+            contentStream.endText();
+            yPosition -= 20;
+        }
+
+        return yPosition - 10;
+    }
+
+    private float escribirTotalFinal(PDPageContentStream contentStream, ComprobantePagoEntity comprobante, float margin, float yPosition) throws IOException {
+        contentStream.setFont(PDType1Font.HELVETICA_BOLD, 14);
+        contentStream.beginText();
+        contentStream.newLineAtOffset(margin, yPosition);
+        contentStream.showText("TOTAL A PAGAR:");
+        contentStream.endText();
+
+        contentStream.beginText();
+        contentStream.newLineAtOffset(400, yPosition);
+        contentStream.showText("$" + comprobante.getMontoTotalConIva().toString());
+        contentStream.endText();
+        yPosition -= 40;
+
+        // Línea separadora
+        contentStream.moveTo(margin, yPosition);
+        contentStream.lineTo(545, yPosition);
+        contentStream.stroke();
+        yPosition -= 30;
+
+        return yPosition;
+    }
+
+    private void escribirPieDocumento(PDPageContentStream contentStream, float margin, float yPosition) throws IOException {
+        contentStream.setFont(PDType1Font.HELVETICA, 10);
+        contentStream.beginText();
+        contentStream.newLineAtOffset(margin, yPosition);
+        contentStream.showText("Este comprobante debe ser presentado el dia de su visita a KartingRM");
+        contentStream.endText();
+        yPosition -= 15;
+
+        contentStream.beginText();
+        contentStream.newLineAtOffset(margin, yPosition);
+        contentStream.showText("Generado el: " + LocalDate.now().format(DATE_FORMAT));
+        contentStream.endText();
+    }
+
+    private byte[] convertirPDFAByteArray(PDDocument document) throws IOException {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        document.save(baos);
+        return baos.toByteArray();
     }
 
     private void enviarEmail(String destinatario, String asunto, String mensaje, byte[] pdfAdjunto) throws MessagingException {
-        try {
-            MimeMessage message = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
 
-            helper.setTo(destinatario);
-            helper.setFrom("aedope.pbpaa@gmail.com");
-            helper.setSubject(asunto);
-            helper.setText(mensaje);
+        helper.setTo(destinatario);
+        helper.setFrom("aedope.pbpaa@gmail.com");
+        helper.setSubject(asunto);
+        helper.setText(mensaje);
 
-            // Adjuntar PDF
-            ByteArrayDataSource dataSource = new ByteArrayDataSource(pdfAdjunto, "application/pdf");
-            helper.addAttachment("Comprobante_KartingRM.pdf", dataSource);
+        // Adjuntar PDF
+        ByteArrayDataSource dataSource = new ByteArrayDataSource(pdfAdjunto, "application/pdf");
+        helper.addAttachment("Comprobante_KartingRM.pdf", dataSource);
 
-            mailSender.send(message);
-            System.out.println("Email enviado exitosamente a: " + destinatario);
-
-        } catch (MessagingException e) {
-            System.err.println("Error al enviar email a: " + destinatario);
-            System.err.println("Error: " + e.getMessage());
-            throw e;
-        }
+        mailSender.send(message);
+        logger.info("Email enviado exitosamente a: {}", destinatario);
     }
-    // MÉTODO ADICIONAL PARA AGREGAR AL ComprobantePagoService
 
     /**
      * Método público para generar PDF (para uso en el controlador)
      */
     public byte[] generarPDFPublico(ComprobantePagoEntity comprobante) throws IOException {
         return generarPDF(comprobante);
-    }
-
-    /**
-     * Método para generar comprobantes automáticamente al crear reservas
-     * (se llama desde ReservaService)
-     */
-    @Transactional
-    public ComprobantePagoEntity generarComprobanteAutomatico(Long reservaId) {
-        try {
-            // Verificar si ya existe un comprobante para esta reserva
-            Optional<ComprobantePagoEntity> comprobanteExistente = getComprobanteByReservaId(reservaId);
-            if (comprobanteExistente.isPresent()) {
-                System.out.println("Comprobante ya existe para reserva ID: " + reservaId);
-                return comprobanteExistente.get();
-            }
-
-            // Generar nuevo comprobante
-            ComprobantePagoEntity comprobante = generarComprobantePago(reservaId);
-            System.out.println("Comprobante generado automáticamente para reserva: " + reservaId);
-
-            return comprobante;
-        } catch (Exception e) {
-            System.err.println("Error al generar comprobante automático para reserva " + reservaId + ": " + e.getMessage());
-            throw new RuntimeException("Error al generar comprobante automático", e);
-        }
-    }
-
-    /**
-     * Método para generar comprobantes faltantes para reservas existentes
-     */
-    @Transactional
-    public int generarComprobantesFaltantesService() {
-        try {
-            List<ReservaEntity> todasLasReservas = reservaService.obtenerTodasLasReservas();
-            int comprobantesGenerados = 0;
-
-            for (ReservaEntity reserva : todasLasReservas) {
-                try {
-                    // Verificar si ya existe un comprobante para esta reserva
-                    Optional<ComprobantePagoEntity> comprobanteExistente =
-                            getComprobanteByReservaId(reserva.getIdReserva());
-
-                    if (comprobanteExistente.isEmpty()) {
-                        // Generar comprobante faltante
-                        generarComprobantePago(reserva.getIdReserva());
-                        comprobantesGenerados++;
-                        System.out.println("Comprobante generado para reserva: " + reserva.getIdReserva());
-                    }
-                } catch (Exception e) {
-                    System.err.println("Error generando comprobante para reserva " +
-                            reserva.getIdReserva() + ": " + e.getMessage());
-                }
-            }
-
-            System.out.println("Proceso completado. Comprobantes generados: " + comprobantesGenerados);
-            return comprobantesGenerados;
-
-        } catch (Exception e) {
-            System.err.println("Error en el proceso de generación de comprobantes faltantes: " + e.getMessage());
-            throw new RuntimeException("Error generando comprobantes faltantes", e);
-        }
     }
 }

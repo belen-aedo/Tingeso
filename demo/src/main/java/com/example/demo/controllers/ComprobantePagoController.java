@@ -2,7 +2,9 @@ package com.example.demo.controllers;
 
 import com.example.demo.entities.ComprobantePagoEntity;
 import com.example.demo.service.ComprobantePagoService;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -15,10 +17,16 @@ import java.util.Optional;
 @CrossOrigin("*")
 @RequestMapping("/api/comprobantes")
 public class ComprobantePagoController {
+    private static final String LOG_MESSAGE_FORMAT = "{} {}: {}";
+    private static final Logger logger = LoggerFactory.getLogger(ComprobantePagoController.class);
+    private static final String ERROR_OBTENER_COMPROBANTES = "Error al obtener todos los comprobantes";
+    private static final String ERROR_OBTENER_COMPROBANTE_ID = "Error al obtener comprobante por ID";
+    private static final String ERROR_GENERAR_COMPROBANTE = "Error al generar comprobante para reserva";
+    private static final String ERROR_ENVIAR_COMPROBANTE = "Error al enviar comprobante";
+    private static final String ERROR_GENERAR_PDF = "Error al generar PDF para comprobante";
 
     private final ComprobantePagoService comprobantePagoService;
 
-    @Autowired
     public ComprobantePagoController(ComprobantePagoService comprobantePagoService) {
         this.comprobantePagoService = comprobantePagoService;
     }
@@ -29,32 +37,33 @@ public class ComprobantePagoController {
             List<ComprobantePagoEntity> comprobantes = comprobantePagoService.getAllComprobantes();
             return ResponseEntity.ok(comprobantes);
         } catch (Exception e) {
-            System.err.println("Error al obtener todos los comprobantes: " + e.getMessage());
-            return ResponseEntity.internalServerError().build();
+            logger.error("{}: {}", ERROR_OBTENER_COMPROBANTES, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
     @GetMapping("/{id}")
     public ResponseEntity<ComprobantePagoEntity> obtenerPorId(@PathVariable Long id) {
+
         try {
             Optional<ComprobantePagoEntity> comprobante = comprobantePagoService.getComprobanteById(id);
-            return comprobante.map(ResponseEntity::ok)
-                    .orElseGet(() -> ResponseEntity.notFound().build());
+            return comprobante.map(c -> ResponseEntity.status(HttpStatus.OK).body(c))
+                    .orElseGet(() -> ResponseEntity.status(HttpStatus.NOT_FOUND).build());
         } catch (Exception e) {
-            System.err.println("Error al obtener comprobante por ID " + id + ": " + e.getMessage());
-            return ResponseEntity.internalServerError().build();
+            logger.error(LOG_MESSAGE_FORMAT, ERROR_OBTENER_COMPROBANTE_ID, id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
     @PostMapping("/generar/{reservaId}")
     @Transactional // Solo para operaciones de escritura
-    public ResponseEntity<ComprobantePagoEntity> generarComprobante(@PathVariable Long reservaId) {
+    public ResponseEntity<ComprobantePagoEntity> generarComprobantePago(@PathVariable Long reservaId) {
         try {
             ComprobantePagoEntity comprobante = comprobantePagoService.generarComprobantePago(reservaId);
             return ResponseEntity.ok(comprobante);
         } catch (Exception e) {
-            System.err.println("Error al generar comprobante para reserva " + reservaId + ": " + e.getMessage());
-            return ResponseEntity.badRequest().body(null);
+            logger.error(LOG_MESSAGE_FORMAT, ERROR_GENERAR_COMPROBANTE, reservaId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
@@ -65,8 +74,9 @@ public class ComprobantePagoController {
             comprobantePagoService.enviarComprobantePorEmail(comprobanteId);
             return ResponseEntity.ok("Comprobante enviado por correo con éxito.");
         } catch (Exception e) {
-            System.err.println("Error al enviar comprobante " + comprobanteId + ": " + e.getMessage());
-            return ResponseEntity.badRequest().body("Error al enviar comprobante: " + e.getMessage());
+            logger.error(LOG_MESSAGE_FORMAT, ERROR_ENVIAR_COMPROBANTE, comprobanteId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error al enviar comprobante: " + e.getMessage());
         }
     }
 
@@ -87,8 +97,8 @@ public class ComprobantePagoController {
                     .body(pdfBytes);
 
         } catch (Exception e) {
-            System.err.println("Error al generar PDF para comprobante " + comprobanteId + ": " + e.getMessage());
-            return ResponseEntity.internalServerError().build();
+            logger.error(LOG_MESSAGE_FORMAT, ERROR_GENERAR_PDF, comprobanteId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 }

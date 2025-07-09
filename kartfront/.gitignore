@@ -22,3 +22,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# SonarQube
+sonar-project.properties
+eslint-report.json
+.scannerwork/
+coverage/
+
+# Archivos de configuración con tokens sensibles
+*.properties
+!*.properties.template

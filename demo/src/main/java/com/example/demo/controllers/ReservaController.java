@@ -2,7 +2,6 @@ package com.example.demo.controllers;
 
 import com.example.demo.entities.ReservaEntity;
 import com.example.demo.service.ReservaService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,9 +15,11 @@ import java.util.List;
 @CrossOrigin("*")
 public class ReservaController {
 
-    @Autowired
-    private ReservaService reservaService;
+    private final ReservaService reservaService;
 
+    public ReservaController(ReservaService reservaService) {
+        this.reservaService = reservaService;
+    }
     // Obtener todas las reservas
     @GetMapping
     public ResponseEntity<List<ReservaEntity>> obtenerTodasLasReservas() {
@@ -73,13 +74,10 @@ public class ReservaController {
     // Eliminar una reserva
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminarReserva(@PathVariable Long id) {
-        try {
-            reservaService.eliminarReserva(id);
-            return ResponseEntity.noContent().build();
-        } catch (RuntimeException e) {
-            return ResponseEntity.notFound().build();
-        }
+        reservaService.eliminarReserva(id);
+        return ResponseEntity.noContent().build();
     }
+
 
     // Obtener reservas como DTO para calendario
     @GetMapping("/dto")

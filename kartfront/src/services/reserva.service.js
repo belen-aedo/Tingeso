@@ -1,37 +1,13 @@
 import httpClient from "../http-common";
 
-const getAll = () => {
-    return httpClient.get("/reservas");
-};
-
-const getById = (id) => {
-    return httpClient.get(`/reservas/${id}`);
-};
-
-const getByDia = (fecha) => {
-    return httpClient.get(`/reservas/dia/${fecha}`);
-};
-
-const getByCliente = (rut) => {
-    return httpClient.get(`/reservas/cliente/${rut}`);
-};
-
-const create = (reserva) => {
-    return httpClient.post("/reservas", reserva);
-};
-
-const update = (id, reserva) => {
-    return httpClient.put(`/reservas/${id}`, reserva);
-};
-
-//const getAllDTO = () => {
-    //return httpClient.get("/reservas/dto");
-//};
-
-
-const remove = (id) => {
-    return httpClient.delete(`/reservas/${id}`);
-};
+const getAll = () => httpClient.get("/reservas");
+const getById = (id) => httpClient.get(`/reservas/${id}`);
+const getByDia = (fecha) => httpClient.get(`/reservas/dia/${fecha}`);
+const getByCliente = (rut) => httpClient.get(`/reservas/cliente/${rut}`);
+const create = (reserva) => httpClient.post("/reservas", reserva);
+const update = (id, reserva) => httpClient.put(`/reservas/${id}`, reserva);
+const remove = (id) => httpClient.delete(`/reservas/${id}`);
+const getAllDTO = () => httpClient.get("/reservas/dto");
 
 export default {
     getAll,
@@ -40,5 +16,6 @@ export default {
     getByCliente,
     create,
     update,
-    remove
+    remove,       // ✅ Importante
+    getAllDTO
 };

@@ -39,7 +39,22 @@ function Reportes() {
   };
 
   const handleChange = (e) => {
-    setNuevo({ ...nuevo, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    
+    // Validación específica para ingresoTotal
+    if (name === 'ingresoTotal' && parseFloat(value) < 0) {
+      setMensaje('Ingrese número positivo');
+      setTipoMensaje('error');
+      return;
+    }
+    
+    // Limpiar mensaje si el valor es válido
+    if (name === 'ingresoTotal' && parseFloat(value) >= 0) {
+      setMensaje('');
+      setTipoMensaje('');
+    }
+    
+    setNuevo({ ...nuevo, [name]: value });
   };
 
   const crearReporte = (e) => {
@@ -48,6 +63,13 @@ function Reportes() {
     // Validaciones adicionales
     if (!nuevo.tipoReporte || !nuevo.mesGenerado || !nuevo.ingresoTotal) {
       setMensaje('Por favor complete todos los campos requeridos');
+      setTipoMensaje('error');
+      return;
+    }
+
+    // Validación del ingreso total
+    if (parseFloat(nuevo.ingresoTotal) < 0) {
+      setMensaje('Ingrese número positivo');
       setTipoMensaje('error');
       return;
     }
@@ -144,24 +166,64 @@ function Reportes() {
         padding: '10px 20px',
         zIndex: 1000,
       }}>
-        <div style={{ width: '100%', display: 'flex', alignItems: 'center' }}>
-          <button
-            onClick={() => setMostrarMenu(!mostrarMenu)}
-            style={{
-              backgroundColor: 'white',
-              color: '#c62828',
-              border: 'none',
-              borderRadius: '4px',
-              padding: '8px 12px',
-              fontWeight: 'bold',
-              cursor: 'pointer',
-              marginRight: '20px'
-            }}
-          >
-            Menú
-          </button>
+        <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ display: 'flex', alignItems: 'center' }}>
+            <button
+              onClick={() => setMostrarMenu(!mostrarMenu)}
+              style={{
+                backgroundColor: 'white',
+                color: '#c62828',
+                border: 'none',
+                borderRadius: '4px',
+                padding: '8px 12px',
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                marginRight: '20px',
+                transition: 'all 0.2s'
+              }}
+              onMouseOver={(e) => {
+                e.target.style.backgroundColor = '#f5f5f5';
+                e.target.style.transform = 'scale(1.05)';
+              }}
+              onMouseOut={(e) => {
+                e.target.style.backgroundColor = 'white';
+                e.target.style.transform = 'scale(1)';
+              }}
+            >
+              {mostrarMenu ? '✕ Cerrar' : '☰ Menú'}
+            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{ 
+                fontSize: '24px',
+                background: 'linear-gradient(45deg, #ffffff, #f0f0f0)',
+                borderRadius: '50%',
+                padding: '5px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.2)'
+              }}>
+                🏁
+              </div>
+              <h2 style={{ 
+                margin: 0, 
+                fontSize: '24px',
+                fontWeight: '700',
+                textShadow: '1px 1px 2px rgba(0,0,0,0.3)',
+                letterSpacing: '0.5px'
+              }}>
+                Sistema Arriendo Karting - Reportes
+              </h2>
+              <div style={{
+                backgroundColor: 'rgba(255,255,255,0.2)',
+                padding: '4px 8px',
+                borderRadius: '12px',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                marginLeft: '10px'
+              }}>
+                Análisis de Datos
+              </div>
+            </div>
+          </div>
         </div>
-        <h2 style={{ marginTop: '0px' }}>Arriendo de Karting</h2>
       </header>
 
       {mostrarMenu && (
@@ -239,7 +301,17 @@ function Reportes() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <label>Ingreso Total</label>
-              <input type="number" name="ingresoTotal" placeholder="Ingreso Total" value={nuevo.ingresoTotal} onChange={handleChange} required style={{ padding: '8px', width: '140px' }} />
+              <input 
+                type="number" 
+                name="ingresoTotal" 
+                placeholder="Ingreso Total" 
+                value={nuevo.ingresoTotal} 
+                onChange={handleChange} 
+                min="0"
+                step="0.01"
+                required 
+                style={{ padding: '8px', width: '140px' }} 
+              />
             </div>
           </div>
 

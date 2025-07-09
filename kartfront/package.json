@@ -7,7 +7,16 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "lint:fix": "eslint . --fix",
+    "lint:report": "eslint . --format json --output-file eslint-report.json",
+    "preview": "vite preview",
+    "sonar": "sonar-scanner",
+    "sonar:token": "sonar-scanner -Dsonar.login=sqp_cf490bce8d752bcddccd6f3b96ecb867ba3129d6",
+    "sonar:windows": "run-sonar.bat",
+    "sonar:simple": "run-sonar-simple.bat",
+    "sonar:complete": "run-sonar-complete.bat",
+    "sonar:verify": "verify-sonarqube.bat",
+    "sonar:test": "test-new-token.bat"
   },
   "dependencies": {
     "axios": "^1.9.0",

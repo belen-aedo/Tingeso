@@ -24,6 +24,8 @@ public class ReservaEntity {
     @ManyToOne
     private ClienteEntity cliente;
 
+
+
     private LocalDate diaReserva;
     private LocalTime horaInicio;
     private LocalTime horaFin;

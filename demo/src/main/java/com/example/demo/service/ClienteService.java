@@ -115,13 +115,11 @@ public class ClienteService {
         int resto = suma % 11;
         int dv = 11 - resto;
 
-        if (dv == 11) {
-            return '0';
-        } else if (dv == 10) {
-            return 'K';
-        } else {
-            return (char) ('0' + dv);
-        }
+        return switch (dv) {
+            case 11 -> '0';
+            case 10 -> 'K';
+            default -> (char) ('0' + dv);
+        };
     }
 
     /**

@@ -1,0 +1,32 @@
+# Directorios de construcción y dependencias
+node_modules/
+dist/
+build/
+coverage/
+
+# Archivos de configuración
+*.config.js
+*.config.jsx
+vite.config.js
+eslint.config.js
+Dockerfile
+Jenkinsfile
+run-sonar.bat
+
+# Archivos de documentación
+README.md
+*.md
+
+# Archivos de configuración de Docker/Nginx
+nginx/
+public/
+
+# Archivos de configuración de SonarQube
+sonar-project.properties
+.sonarignore
+eslint-report.json
+
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+*.log

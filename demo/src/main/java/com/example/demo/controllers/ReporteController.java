@@ -3,7 +3,9 @@ package com.example.demo.controllers;
 import com.example.demo.entities.ReporteEntity;
 import com.example.demo.entities.ReporteMensualEntity;
 import com.example.demo.service.ReporteService;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -16,21 +18,25 @@ import java.util.Optional;
 @CrossOrigin("*")
 public class ReporteController {
 
-    @Autowired
-    private ReporteService reporteService;
+    private static final Logger logger = LoggerFactory.getLogger(ReporteController.class);
+    private final ReporteService reporteService;
+
+    public ReporteController(ReporteService reporteService) {
+        this.reporteService = reporteService;
+    }
 
     // ===================== REPORTES INDIVIDUALES =====================
 
     @PostMapping("/individual")
-    public ResponseEntity<?> crearReporte(@RequestBody ReporteEntity reporte) {
+    public ResponseEntity<ReporteEntity> crearReporte(@RequestBody ReporteEntity reporte) {
         try {
             ReporteEntity nuevoReporte = reporteService.guardarReporte(reporte);
             return ResponseEntity.ok(nuevoReporte);
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Error al crear el reporte: " + e.getMessage());
+            logger.error("Error al crear el reporte: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
-
     @GetMapping("/individual")
     public ResponseEntity<List<ReporteEntity>> obtenerTodosIndividuales() {
         return ResponseEntity.ok(reporteService.obtenerTodos());
@@ -59,12 +65,13 @@ public class ReporteController {
     }
 
     @DeleteMapping("/individual/{id}")
-    public ResponseEntity<?> eliminarReporteIndividual(@PathVariable Long id) {
+    public ResponseEntity<Void> eliminarReporteIndividual(@PathVariable Long id) {
         try {
             reporteService.eliminarReporte(id);
             return ResponseEntity.noContent().build();
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body("Error al eliminar el reporte: " + e.getMessage());
+            logger.error("Error al eliminar el reporte con ID {}: {}", id, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 

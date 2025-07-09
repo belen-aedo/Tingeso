@@ -2,7 +2,8 @@ package com.example.demo.controllers;
 
 import com.example.demo.entities.ClienteEntity;
 import com.example.demo.service.ClienteService;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,8 +16,15 @@ import java.util.Optional;
 @CrossOrigin("*") // Para permitir peticiones desde cualquier origen (útil para frontend)
 public class ClienteController {
 
-    @Autowired
-    private ClienteService clienteService;
+    private static final Logger logger = LoggerFactory.getLogger(ClienteController.class);
+    private static final String ERROR_INTERNO_SERVIDOR = "Error interno del servidor";
+    private static final String ERROR_INTERNO_ELIMINAR = "Error interno al eliminar cliente";
+
+    private final ClienteService clienteService;
+
+    public ClienteController(ClienteService clienteService) {
+        this.clienteService = clienteService;
+    }
 
     // Obtener todos los clientes
     @GetMapping("/")
@@ -25,13 +33,14 @@ public class ClienteController {
             List<ClienteEntity> clientes = clienteService.getAllClientes();
             return ResponseEntity.ok(clientes);
         } catch (Exception e) {
+            logger.error("Error al obtener clientes", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
     // Obtener cliente por RUT
     @GetMapping("/{rut}")
-    public ResponseEntity<?> getClienteByRut(@PathVariable String rut) {
+    public ResponseEntity<Object> getClienteByRut(@PathVariable String rut) {
         try {
             Optional<ClienteEntity> cliente = clienteService.getClienteByRutValidado(rut);
             if (cliente.isPresent()) {
@@ -44,14 +53,15 @@ public class ClienteController {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body("RUT inválido: " + e.getMessage());
         } catch (Exception e) {
+            logger.error("Error al obtener cliente por RUT", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error interno del servidor");
+                    .body(ERROR_INTERNO_SERVIDOR);
         }
     }
 
     // Obtener cliente por email
     @GetMapping("/email/{email}")
-    public ResponseEntity<?> getClienteByEmail(@PathVariable String email) {
+    public ResponseEntity<Object> getClienteByEmail(@PathVariable String email) {
         try {
             Optional<ClienteEntity> cliente = clienteService.getClienteByEmail(email);
             if (cliente.isPresent()) {
@@ -61,14 +71,15 @@ public class ClienteController {
                         .body("Cliente no encontrado con email: " + email);
             }
         } catch (Exception e) {
+            logger.error("Error al obtener cliente por email", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error interno del servidor");
+                    .body(ERROR_INTERNO_SERVIDOR);
         }
     }
 
     // Obtener clientes por rango de visitas
     @GetMapping("/visitas")
-    public ResponseEntity<?> getClientesByVisitas(
+    public ResponseEntity<Object> getClientesByVisitas(
             @RequestParam int min,
             @RequestParam int max
     ) {
@@ -80,14 +91,15 @@ public class ClienteController {
             List<ClienteEntity> clientes = clienteService.getClientesByRangoVisitas(min, max);
             return ResponseEntity.ok(clientes);
         } catch (Exception e) {
+            logger.error("Error al obtener clientes por visitas", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error interno del servidor");
+                    .body(ERROR_INTERNO_SERVIDOR);
         }
     }
 
     // Crear o actualizar cliente
     @PostMapping("/")
-    public ResponseEntity<?> saveCliente(@RequestBody ClienteEntity cliente) {
+    public ResponseEntity<Object> saveCliente(@RequestBody ClienteEntity cliente) {
         try {
             // Validaciones básicas
             if (cliente.getRut() == null || cliente.getRut().trim().isEmpty()) {
@@ -105,6 +117,7 @@ public class ClienteController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         } catch (Exception e) {
+            logger.error("Error al crear cliente", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error interno al crear cliente");
         }
@@ -112,13 +125,14 @@ public class ClienteController {
 
     // Incrementar visitas del cliente
     @PutMapping("/incrementar-visita/{rut}")
-    public ResponseEntity<?> incrementarVisita(@PathVariable String rut) {
+    public ResponseEntity<String> incrementarVisita(@PathVariable String rut) {
         try {
             clienteService.incrementarVisitaCliente(rut);
             return ResponseEntity.ok("Visita incrementada correctamente");
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         } catch (Exception e) {
+            logger.error("Error al incrementar visita", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error interno al incrementar visita");
         }
@@ -126,20 +140,21 @@ public class ClienteController {
 
     // Resetear visitas mensuales de todos los clientes
     @PutMapping("/resetear-visitas")
-    public ResponseEntity<?> resetearVisitas() {
+    public ResponseEntity<String> resetearVisitas() {
         try {
             clienteService.resetearVisitasMensuales();
             return ResponseEntity.ok("Visitas mensuales reseteadas correctamente");
         } catch (Exception e) {
+            logger.error("Error al resetear visitas", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error interno al resetear visitas");
         }
     }
 
     @DeleteMapping("/{rut}")
-    public ResponseEntity<?> deleteCliente(@PathVariable String rut) {
+    public ResponseEntity<String> deleteCliente(@PathVariable String rut) {
         try {
-            System.out.println("Intentando eliminar cliente con RUT: " + rut);
+            logger.info("Intentando eliminar cliente con RUT: {}", rut);
 
             // Verificar que el cliente existe antes de eliminar
             Optional<ClienteEntity> cliente = clienteService.getClienteByRutValidado(rut);
@@ -153,16 +168,15 @@ public class ClienteController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         } catch (Exception e) {
-            System.err.println("Error al eliminar cliente: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error al eliminar cliente", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error interno al eliminar cliente");
+                    .body(ERROR_INTERNO_ELIMINAR);
         }
     }
 
     // Endpoint adicional para validar RUT
     @GetMapping("/validar-rut/{rut}")
-    public ResponseEntity<?> validarRut(@PathVariable String rut) {
+    public ResponseEntity<Object> validarRut(@PathVariable String rut) {
         try {
             boolean esValido = clienteService.esRutValido(rut);
             if (esValido) {
@@ -172,6 +186,7 @@ public class ClienteController {
                 return ResponseEntity.ok(new RutValidationResponse(false, null, "RUT inválido"));
             }
         } catch (Exception e) {
+            logger.error("Error al validar RUT", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body("Error al validar RUT");
         }

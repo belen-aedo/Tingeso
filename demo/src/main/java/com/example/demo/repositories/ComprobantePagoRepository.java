@@ -9,7 +9,8 @@ import java.util.List;
 import java.util.Optional;
 @Repository
 public interface ComprobantePagoRepository extends JpaRepository<ComprobantePagoEntity, Long> {
-    Optional<ComprobantePagoEntity> findByReservaIdReserva(Long reservaId);
     List<ComprobantePagoEntity> findByCliente(ClienteEntity cliente);
     List<ComprobantePagoEntity> findAll();
+    Optional<ComprobantePagoEntity> findByReservaIdReserva(Long idReserva);
+
 }

@@ -47,17 +47,13 @@ public class KartService {
     public KartEntity saveKart(KartEntity kart) {
         return kartRepository.save(kart);
     }
-
-    // ✅ CORREGIDO: Eliminar un kart usando el código como ID
     public void deleteKart(String codigo) {
-        System.out.println("Intentando eliminar kart con código: " + codigo);
         if (!kartRepository.existsById(codigo)) {
-            System.out.println("Kart no encontrado: " + codigo);
-            throw new RuntimeException("Kart con código " + codigo + " no encontrado");
+            throw new IllegalArgumentException("Kart con código " + codigo + " no encontrado");
         }
-        System.out.println("Eliminando kart: " + codigo);
         kartRepository.deleteById(codigo);
     }
+
 
     /**
      * Cambia el estado de un kart
@@ -66,16 +62,13 @@ public class KartService {
      * @return El kart actualizado o vacío si no existe
      */
     public Optional<KartEntity> cambiarEstadoKart(String codigo, String estado) {
-        System.out.println("Cambiando estado del kart " + codigo + " a: " + estado);
         Optional<KartEntity> kartOpt = kartRepository.findById(codigo);
         if (kartOpt.isPresent()) {
             KartEntity kart = kartOpt.get();
             kart.setEstado(estado);
             KartEntity kartActualizado = kartRepository.save(kart);
-            System.out.println("Estado actualizado exitosamente");
             return Optional.of(kartActualizado);
         }
-        System.out.println("Kart no encontrado: " + codigo);
         return Optional.empty();
     }
 

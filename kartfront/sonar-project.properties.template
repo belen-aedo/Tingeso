@@ -1,0 +1,36 @@
+# Configuración del proyecto
+sonar.projectKey=kartfront
+sonar.projectName=Karting Frontend - Sistema Arriendo
+sonar.projectVersion=0.0.0
+
+# Configuración del servidor SonarQube
+sonar.host.url=http://localhost:9000
+
+# Configuración de archivos fuente
+sonar.sources=src
+sonar.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/*.test.js,**/*.test.jsx,**/coverage/**,**/nginx/**,**/public/**
+
+# Configuración de tests
+sonar.tests=src
+sonar.test.inclusions=**/*.test.js,**/*.test.jsx
+
+# Configuración de lenguaje
+sonar.language=js
+sonar.sourceEncoding=UTF-8
+
+# Configuración específica para React/Vite
+sonar.javascript.file.suffixes=.js,.jsx
+sonar.typescript.file.suffixes=.ts,.tsx
+
+# Reportes de herramientas
+sonar.eslint.reportPaths=eslint-report.json
+sonar.javascript.lcov.reportPaths=coverage/lcov.info
+
+# Configuración adicional para React
+sonar.coverage.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/coverage/**,**/nginx/**,**/public/**,**/*.config.js,**/*.config.jsx
+
+# Token de autenticación (TEMPLATE - reemplaza con tu token real)
+# sonar.login=tu_token_aqui
+
+# Alternativamente, puedes pasar el token como parámetro en la línea de comandos:
+# sonar-scanner -Dsonar.login=tu_token_aqui
