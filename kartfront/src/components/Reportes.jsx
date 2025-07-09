@@ -9,6 +9,7 @@ function Reportes() {
   const [mensaje, setMensaje] = useState('');
   const [tipoMensaje, setTipoMensaje] = useState('');
   const [filtroMensual, setFiltroMensual] = useState('PorVueltas');
+  const [filtroIndividual, setFiltroIndividual] = useState('Todos');
 
   const [nuevo, setNuevo] = useState({
     tipoReporte: '',
@@ -26,9 +27,13 @@ function Reportes() {
 
   const cargarReportes = () => {
     reporteService.getAll()
-      .then((res) => setReportes(res.data))
-      .catch(() => {
-        setMensaje('Error al cargar reportes');
+      .then((res) => {
+        console.log('Reportes cargados:', res.data);
+        setReportes(res.data);
+      })
+      .catch((error) => {
+        console.error('Error al cargar reportes:', error);
+        setMensaje('Error al cargar reportes: ' + (error.response?.data || error.message));
         setTipoMensaje('error');
       });
   };
@@ -39,8 +44,31 @@ function Reportes() {
 
   const crearReporte = (e) => {
     e.preventDefault();
+    
+    // Validaciones adicionales
+    if (!nuevo.tipoReporte || !nuevo.mesGenerado || !nuevo.ingresoTotal) {
+      setMensaje('Por favor complete todos los campos requeridos');
+      setTipoMensaje('error');
+      return;
+    }
+
+    if (nuevo.tipoReporte === 'PorVueltas' && (!nuevo.numeroVueltas || !nuevo.tiempoMaximo)) {
+      setMensaje('Para reportes por vueltas, complete número de vueltas y tiempo máximo');
+      setTipoMensaje('error');
+      return;
+    }
+
+    if (nuevo.tipoReporte === 'PorPersonas' && (!nuevo.minPersonas || !nuevo.maxPersonas)) {
+      setMensaje('Para reportes por personas, complete mínimo y máximo de personas');
+      setTipoMensaje('error');
+      return;
+    }
+
+    console.log('Datos a enviar:', nuevo);
+    
     reporteService.crear(nuevo)
-      .then(() => {
+      .then((response) => {
+        console.log('Reporte creado exitosamente:', response.data);
         setMensaje('Reporte creado exitosamente');
         setTipoMensaje('exito');
         setNuevo({
@@ -54,8 +82,9 @@ function Reportes() {
         });
         cargarReportes();
       })
-      .catch(() => {
-        setMensaje('Error al crear reporte');
+      .catch((error) => {
+        console.error('Error al crear reporte:', error);
+        setMensaje('Error al crear reporte: ' + (error.response?.data || error.message));
         setTipoMensaje('error');
       });
   };
@@ -68,21 +97,25 @@ function Reportes() {
           setTipoMensaje('exito');
           cargarReportes();
         })
-        .catch(() => {
-          setMensaje('Error al eliminar reporte');
+        .catch((error) => {
+          console.error('Error al eliminar reporte:', error);
+          setMensaje('Error al eliminar reporte: ' + (error.response?.data || error.message));
           setTipoMensaje('error');
         });
     }
   };
 
-  // Reportes individuales (sin agrupar)
-  const reportesIndividuales = reportes.filter(r => r.tipoReporte === 'PorVueltas');
+  // Reportes individuales (todos los tipos con filtro)
+  const reportesIndividuales = filtroIndividual === 'Todos' 
+    ? reportes 
+    : reportes.filter(r => r.tipoReporte === filtroIndividual);
 
   // Reportes mensuales agrupados por mes
   const mensualesFiltrados = reportes.filter(r => r.tipoReporte === filtroMensual);
   const reportesMensuales = Object.values(
     mensualesFiltrados.reduce((acc, r) => {
-      const mes = r.mesGenerado.slice(0, 7); // YYYY-MM
+      // Usar 'fecha' en lugar de 'mesGenerado'
+      const mes = r.fecha ? r.fecha.slice(0, 7) : 'Sin fecha'; // YYYY-MM
       if (!acc[mes]) {
         acc[mes] = {
           mes,
@@ -90,7 +123,7 @@ function Reportes() {
           tipoReporte: r.tipoReporte,
         };
       }
-      acc[mes].ingresoTotal += parseInt(r.ingresoTotal);
+      acc[mes].ingresoTotal += parseFloat(r.ingresoTotal) || 0;
       return acc;
     }, {})
   );
@@ -175,13 +208,17 @@ function Reportes() {
         <h3>Gestión de Reportes</h3>
 
         {mensaje && (
-          <p style={{
-            color: tipoMensaje === 'error' ? 'red' : 'green',
-            fontWeight: 'bold',
-            marginBottom: '20px'
+          <div style={{
+            padding: '10px',
+            marginBottom: '20px',
+            borderRadius: '4px',
+            backgroundColor: tipoMensaje === 'error' ? '#ffebee' : '#e8f5e8',
+            color: tipoMensaje === 'error' ? '#c62828' : '#2e7d32',
+            border: `1px solid ${tipoMensaje === 'error' ? '#ffcdd2' : '#c8e6c9'}`,
+            fontWeight: 'bold'
           }}>
             {mensaje}
-          </p>
+          </div>
         )}
 
         {/* Formulario */}
@@ -197,7 +234,7 @@ function Reportes() {
               </select>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <label>Mes Generado</label>
+              <label>Fecha del Reporte</label>
               <input type="date" name="mesGenerado" value={nuevo.mesGenerado} onChange={handleChange} required style={{ padding: '8px', width: '160px' }} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -249,8 +286,33 @@ function Reportes() {
         {/* Filtro de tipo mensual */}
         <div style={{ marginBottom: '10px' }}>
           <strong>Mostrar en reportes mensuales:</strong>{' '}
-          <button onClick={() => setFiltroMensual('PorVueltas')} style={{ marginRight: '10px' }}>Por Vueltas</button>
-          <button onClick={() => setFiltroMensual('PorPersonas')}>Por Personas</button>
+          <button 
+            onClick={() => setFiltroMensual('PorVueltas')} 
+            style={{ 
+              marginRight: '10px',
+              backgroundColor: filtroMensual === 'PorVueltas' ? '#4CAF50' : '#f0f0f0',
+              color: filtroMensual === 'PorVueltas' ? 'white' : 'black',
+              border: 'none',
+              padding: '5px 10px',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Por Vueltas
+          </button>
+          <button 
+            onClick={() => setFiltroMensual('PorPersonas')}
+            style={{ 
+              backgroundColor: filtroMensual === 'PorPersonas' ? '#4CAF50' : '#f0f0f0',
+              color: filtroMensual === 'PorPersonas' ? 'white' : 'black',
+              border: 'none',
+              padding: '5px 10px',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Por Personas
+          </button>
         </div>
 
         {/* Reportes Mensuales */}
@@ -280,11 +342,58 @@ function Reportes() {
 
         {/* Reportes Individuales */}
         <h4>Reportes Individuales</h4>
+        
+        {/* Filtro para reportes individuales */}
+        <div style={{ marginBottom: '10px' }}>
+          <strong>Mostrar reportes individuales:</strong>{' '}
+          <button 
+            onClick={() => setFiltroIndividual('Todos')} 
+            style={{ 
+              marginRight: '10px',
+              backgroundColor: filtroIndividual === 'Todos' ? '#4CAF50' : '#f0f0f0',
+              color: filtroIndividual === 'Todos' ? 'white' : 'black',
+              border: 'none',
+              padding: '5px 10px',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Todos
+          </button>
+          <button 
+            onClick={() => setFiltroIndividual('PorVueltas')} 
+            style={{ 
+              marginRight: '10px',
+              backgroundColor: filtroIndividual === 'PorVueltas' ? '#4CAF50' : '#f0f0f0',
+              color: filtroIndividual === 'PorVueltas' ? 'white' : 'black',
+              border: 'none',
+              padding: '5px 10px',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Por Vueltas
+          </button>
+          <button 
+            onClick={() => setFiltroIndividual('PorPersonas')}
+            style={{ 
+              backgroundColor: filtroIndividual === 'PorPersonas' ? '#4CAF50' : '#f0f0f0',
+              color: filtroIndividual === 'PorPersonas' ? 'white' : 'black',
+              border: 'none',
+              padding: '5px 10px',
+              borderRadius: '4px',
+              cursor: 'pointer'
+            }}
+          >
+            Por Personas
+          </button>
+        </div>
         <table border="1" cellPadding="10" style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead style={{ backgroundColor: '#f2f2f2' }}>
             <tr>
               <th>ID</th>
-              <th>Mes</th>
+              <th>Tipo</th>
+              <th>Fecha</th>
               <th>Ingreso</th>
               <th>Detalles</th>
               <th>Acciones</th>
@@ -292,14 +401,20 @@ function Reportes() {
           </thead>
           <tbody>
             {reportesIndividuales.length === 0 ? (
-              <tr><td colSpan="5" style={{ textAlign: 'center' }}>No hay reportes</td></tr>
+              <tr><td colSpan="6" style={{ textAlign: 'center' }}>No hay reportes</td></tr>
             ) : (
               reportesIndividuales.map(r => (
                 <tr key={r.id}>
                   <td>{r.id}</td>
-                  <td>{r.mesGenerado}</td>
+                  <td>{r.tipoReporte}</td>
+                  <td>{r.fecha}</td>
                   <td>${r.ingresoTotal?.toLocaleString()}</td>
-                  <td>{`${r.numeroVueltas} vueltas - ${r.tiempoMaximo} min`}</td>
+                  <td>
+                    {r.tipoReporte === 'PorVueltas' 
+                      ? `${r.numeroVueltas} vueltas - ${r.tiempoMaximo} min`
+                      : `${r.minPersonas} - ${r.maxPersonas} personas`
+                    }
+                  </td>
                   <td>
                     <button
                       onClick={() => eliminarReporte(r.id)}

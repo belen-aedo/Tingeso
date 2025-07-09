@@ -25,15 +25,12 @@ const incrementarVisita = (rut) => {
 };
 
 const resetearVisitas = () => {
-    return httpClient.put("/clientes/resetear-visitas")
-      
+    return httpClient.put("/clientes/resetear-visitas");
 };
 
 const deleteCliente = (rut) => {
-  return httpClient.delete(`/clientes/${rut}`);
+    return httpClient.delete(`/clientes/${rut}`);
 };
-
-
 
 export default {
     getAllClientes,

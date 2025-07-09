@@ -42,7 +42,7 @@ public class ReporteController {
     }
 
     @GetMapping("/individual/fecha")
-    public ResponseEntity<List<ReporteEntity>> obtenerPorFecha(@RequestParam String fecha) {
+    public ResponseEntity<Optional<ReporteEntity>> obtenerPorFecha(@RequestParam String fecha) {
         LocalDate fechaLocal = LocalDate.parse(fecha);
         return ResponseEntity.ok(reporteService.obtenerPorFecha(fechaLocal));
     }

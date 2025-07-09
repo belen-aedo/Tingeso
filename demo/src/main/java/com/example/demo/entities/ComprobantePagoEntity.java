@@ -62,4 +62,4 @@ public class ComprobantePagoEntity {
         private BigDecimal iva;
         //suma del iva más el monto final
         private BigDecimal montoTotalConIva;
-    }
+}

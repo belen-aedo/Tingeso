@@ -10,8 +10,9 @@ import java.util.List;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/comprobantes")
+
 @CrossOrigin("*")
+@RequestMapping("/api/comprobantes")
 public class ComprobantePagoController {
 
     private final ComprobantePagoService comprobantePagoService;

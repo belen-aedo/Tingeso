@@ -143,7 +143,7 @@ public class ReporteService {
         return reporteRepository.findByTipoReporte(tipoReporte);
     }
 
-    public List<ReporteEntity> obtenerPorFecha(LocalDate fecha) {
+    public Optional<ReporteEntity> obtenerPorFecha(LocalDate fecha) {
         return reporteRepository.findByFecha(fecha);
     }
 
@@ -170,6 +170,10 @@ public class ReporteService {
 
     public List<ReporteMensualEntity> obtenerReportesMensualesPorAnio(int anio) {
         return reporteMensualRepository.findByAnio(anio);
+    }
+    public ReporteEntity obtenerPorMes(LocalDate mes) {
+        return (ReporteEntity) reporteRepository.findByMesGenerado(mes)
+                .orElseThrow(() -> new RuntimeException("No se encontró un reporte para el mes: " + mes));
     }
 
 

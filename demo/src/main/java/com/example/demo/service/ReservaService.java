@@ -22,6 +22,10 @@ public class ReservaService {
     @Autowired
     private ClienteRepository clienteRepository;
 
+    // NUEVA DEPENDENCIA: Inyectar el servicio de comprobantes
+    @Autowired
+    private ComprobantePagoService comprobantePagoService;
+
     // Obtener todas las reservas
     public List<ReservaEntity> obtenerTodasLasReservas() {
         return reservaRepository.findAll();
@@ -42,14 +46,50 @@ public class ReservaService {
         return reservaRepository.findByClienteRut(rutCliente);
     }
 
-    // Crear una nueva reserva
+    // MÉTODO MODIFICADO: Crear reserva con generación automática de comprobante
     public ReservaEntity crearReserva(ReservaEntity reserva) {
-        // Verificar que el cliente existe
-        Optional<ClienteEntity> clienteOpt = clienteRepository.findById(reserva.getCliente().getRut());
-        if (clienteOpt.isEmpty()) {
-            throw new RuntimeException("Cliente no encontrado");
+        try {
+            // Verificar que el cliente existe
+            Optional<ClienteEntity> clienteOpt = clienteRepository.findById(reserva.getCliente().getRut());
+            if (clienteOpt.isEmpty()) {
+                throw new RuntimeException("Cliente no encontrado");
+            }
+
+            // Calcular tiempo de reserva si no está establecido
+            if (reserva.getTiempoReserva() <= 0) {
+                reserva.setTiempoReserva(calcularTiempoReserva(reserva.getHoraInicio(), reserva.getHoraFin()));
+            }
+
+            // Guardar la reserva
+            ReservaEntity reservaGuardada = reservaRepository.save(reserva);
+            System.out.println("Reserva creada exitosamente con ID: " + reservaGuardada.getIdReserva());
+
+            // NUEVO: Generar comprobante automáticamente
+            try {
+                comprobantePagoService.generarComprobantePago(reservaGuardada.getIdReserva());
+                System.out.println("Comprobante generado automáticamente para la reserva: " + reservaGuardada.getIdReserva());
+            } catch (Exception e) {
+                System.err.println("Error al generar comprobante automático: " + e.getMessage());
+                // No lanzamos la excepción para que la reserva se mantenga
+                // Solo registramos el error
+            }
+
+            return reservaGuardada;
+
+        } catch (Exception e) {
+            System.err.println("Error al crear reserva: " + e.getMessage());
+            throw new RuntimeException("Error al crear reserva: " + e.getMessage(), e);
         }
-        return reservaRepository.save(reserva);
+    }
+
+    // NUEVO MÉTODO: Calcular tiempo de reserva en minutos
+    private int calcularTiempoReserva(java.time.LocalTime horaInicio, java.time.LocalTime horaFin) {
+        if (horaInicio == null || horaFin == null) {
+            return 30; // Valor por defecto
+        }
+
+        java.time.Duration duration = java.time.Duration.between(horaInicio, horaFin);
+        return (int) duration.toMinutes();
     }
 
     // Actualizar una reserva existente
@@ -86,9 +126,16 @@ public class ReservaService {
             reservaExistente.setAcompanantes(reservaActualizada.getAcompanantes());
         }
 
+        // Recalcular tiempo de reserva
+        reservaExistente.setTiempoReserva(calcularTiempoReserva(
+                reservaExistente.getHoraInicio(),
+                reservaExistente.getHoraFin()
+        ));
+
         return reservaRepository.save(reservaExistente);
     }
 
+    // DTO para calendario
     public static class ReservaDTO {
         public Long id;
         public String cliente;
@@ -117,9 +164,40 @@ public class ReservaService {
         }).collect(Collectors.toList());
     }
 
-
     // Eliminar una reserva
     public void eliminarReserva(Long idReserva) {
         reservaRepository.deleteById(idReserva);
+    }
+
+    // NUEVO MÉTODO: Generar comprobantes para reservas existentes sin comprobante
+    public void generarComprobantesFaltantes() {
+        try {
+            List<ReservaEntity> todasLasReservas = reservaRepository.findAll();
+            int comprobantesGenerados = 0;
+
+            for (ReservaEntity reserva : todasLasReservas) {
+                try {
+                    // Verificar si ya existe un comprobante para esta reserva
+                    Optional<com.example.demo.entities.ComprobantePagoEntity> comprobanteExistente =
+                            comprobantePagoService.getComprobanteByReservaId(reserva.getIdReserva());
+
+                    if (comprobanteExistente.isEmpty()) {
+                        // Generar comprobante faltante
+                        comprobantePagoService.generarComprobantePago(reserva.getIdReserva());
+                        comprobantesGenerados++;
+                        System.out.println("Comprobante generado para reserva: " + reserva.getIdReserva());
+                    }
+                } catch (Exception e) {
+                    System.err.println("Error generando comprobante para reserva " +
+                            reserva.getIdReserva() + ": " + e.getMessage());
+                }
+            }
+
+            System.out.println("Proceso completado. Comprobantes generados: " + comprobantesGenerados);
+
+        } catch (Exception e) {
+            System.err.println("Error en el proceso de generación de comprobantes faltantes: " + e.getMessage());
+            throw new RuntimeException("Error generando comprobantes faltantes", e);
+        }
     }
 }

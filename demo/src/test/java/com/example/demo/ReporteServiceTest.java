@@ -79,12 +79,12 @@ class ReporteServiceTest {
     @Test
     void testObtenerPorMes() {
         LocalDate mes = LocalDate.of(2025, 4, 1);
-        when(reporteRepository.findByMesGenerado(mes)).thenReturn(List.of(reporte));
+        when(reporteRepository.findByMesGenerado(mes)).thenReturn(Optional.of(reporte));
 
-        List<ReporteEntity> lista = reporteService.obtenerPorMes(mes);
+        ReporteEntity resultado = reporteService.obtenerPorMes(mes);
 
-        assertEquals(1, lista.size());
-        assertEquals(15, lista.get(0).getTiempoMaximo());
+        assertNotNull(resultado);
+        assertEquals(15, resultado.getTiempoMaximo());
         verify(reporteRepository, times(1)).findByMesGenerado(mes);
     }
 

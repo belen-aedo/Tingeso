@@ -20,10 +20,70 @@ function Clientes() {
     cargarClientes();
   }, []);
 
+  // Función para validar RUT (misma lógica que el backend)
+  const esRutValido = (rut) => {
+    if (!rut || rut.trim() === '') return false;
+    
+    try {
+      const rutLimpio = limpiarRut(rut);
+      
+      if (rutLimpio.length < 2) return false;
+      
+      const numeroStr = rutLimpio.substring(0, rutLimpio.length - 1);
+      const digitoVerificador = rutLimpio.charAt(rutLimpio.length - 1);
+      
+      const numero = parseInt(numeroStr);
+      
+      if (numero < 1000000 || numero > 99999999) return false;
+      
+      const dvCalculado = calcularDigitoVerificador(numero);
+      
+      return digitoVerificador.toUpperCase() === dvCalculado.toUpperCase();
+    } catch (e) {
+      return false;
+    }
+  };
+
+  const limpiarRut = (rut) => {
+    return rut.replace(/[.\-\s]/g, '').toUpperCase();
+  };
+
+  const calcularDigitoVerificador = (numero) => {
+    let suma = 0;
+    let multiplicador = 2;
+    
+    while (numero > 0) {
+      suma += (numero % 10) * multiplicador;
+      numero = Math.floor(numero / 10);
+      multiplicador = multiplicador === 7 ? 2 : multiplicador + 1;
+    }
+    
+    const resto = suma % 11;
+    const dv = 11 - resto;
+    
+    if (dv === 11) return '0';
+    if (dv === 10) return 'K';
+    return dv.toString();
+  };
+
+  const normalizarRut = (rut) => {
+    if (!esRutValido(rut)) return null;
+    
+    const rutLimpio = limpiarRut(rut);
+    const numero = rutLimpio.substring(0, rutLimpio.length - 1);
+    const dv = rutLimpio.charAt(rutLimpio.length - 1);
+    
+    return numero + '-' + dv;
+  };
+
   const cargarClientes = () => {
     clienteService.getAllClientes().then((res) => {
       setClientes(res.data);
       setMensaje('');
+    }).catch((error) => {
+      console.error('Error al cargar clientes:', error);
+      setMensaje('Error al cargar clientes');
+      setTipoMensaje('error');
     });
   };
 
@@ -33,39 +93,60 @@ function Clientes() {
 
   const crearCliente = (e) => {
     e.preventDefault();
-    clienteService.saveCliente(nuevoCliente).then(() => {
+    
+    // Validar RUT antes de enviar
+    if (!esRutValido(nuevoCliente.rut)) {
+      setMensaje('El RUT ingresado no es válido');
+      setTipoMensaje('error');
+      return;
+    }
+
+    // Normalizar RUT antes de enviar
+    const rutNormalizado = normalizarRut(nuevoCliente.rut);
+    const clienteAEnviar = { ...nuevoCliente, rut: rutNormalizado };
+
+    clienteService.saveCliente(clienteAEnviar).then(() => {
       setMensaje('Cliente creado con éxito');
       setTipoMensaje('exito');
       setNuevoCliente({ rut: '', nombre: '', email: '', fechaCumple: '' });
       cargarClientes();
-    }).catch(() => {
-      setMensaje('Error al crear cliente');
+    }).catch((error) => {
+      console.error('Error al crear cliente:', error);
+      const errorMessage = error.response?.data?.message || error.response?.data || 'Error al crear cliente';
+      setMensaje(errorMessage);
       setTipoMensaje('error');
     });
   };
-  
-
 
   const eliminarCliente = (rut) => {
-  const rutLimpio = rut.replace(/\./g, '').replace(/-/g, '').trim(); // Elimina puntos y guiones
-  const rutFormateado = rutLimpio.slice(0, -1) + '-' + rutLimpio.slice(-1); // Agrega guion antes del dígito verificador
-  console.log("Intentando eliminar cliente", rutFormateado);
+    console.log("RUT original recibido:", rut);
+    
+    // Validar que el RUT sea válido antes de proceder
+    if (!esRutValido(rut)) {
+      setMensaje('El RUT no es válido para eliminar');
+      setTipoMensaje('error');
+      return;
+    }
 
-  if (window.confirm('¿Seguro que deseas eliminar este cliente?')) {
-    clienteService.deleteCliente(rutFormateado)
-      .then(() => {
-        setMensaje('Cliente eliminado');
-        setTipoMensaje('exito');
-        cargarClientes();
-      })
-      .catch((err) => {
-        console.error("Error al eliminar cliente", err.response || err);
-        setMensaje('Error al eliminar cliente');
-        setTipoMensaje('error');
-      });
-  }
-};
+    // Normalizar el RUT (mismo formato que usa el backend)
+    const rutNormalizado = normalizarRut(rut);
+    console.log("RUT normalizado para eliminar:", rutNormalizado);
 
+    if (window.confirm('¿Seguro que deseas eliminar este cliente?')) {
+      clienteService.deleteCliente(rutNormalizado)
+        .then(() => {
+          setMensaje('Cliente eliminado correctamente');
+          setTipoMensaje('exito');
+          cargarClientes();
+        })
+        .catch((error) => {
+          console.error("Error al eliminar cliente:", error.response || error);
+          const errorMessage = error.response?.data || 'Error al eliminar cliente';
+          setMensaje(errorMessage);
+          setTipoMensaje('error');
+        });
+    }
+  };
 
   const buscarCliente = () => {
     if (!buscarRut) {
@@ -73,34 +154,45 @@ function Clientes() {
       return cargarClientes();
     }
 
-    clienteService.getClienteByRut(buscarRut)
+    // Validar RUT antes de buscar
+    if (!esRutValido(buscarRut)) {
+      setMensaje('El RUT ingresado no es válido');
+      setTipoMensaje('error');
+      return;
+    }
+
+    const rutNormalizado = normalizarRut(buscarRut);
+    
+    clienteService.getClienteByRut(rutNormalizado)
       .then((res) => {
         setClientes([res.data]);
         setMensaje('Cliente encontrado');
         setTipoMensaje('exito');
       })
-      .catch(() => {
+      .catch((error) => {
+        console.error('Error al buscar cliente:', error);
         setClientes([]);
-        setMensaje('RUT erróneo');
+        setMensaje('Cliente no encontrado');
         setTipoMensaje('error');
       });
   };
-  // Función para resetear visitas
-const resetearVisitas = () => {
-  if (window.confirm("¿Seguro que deseas resetear las visitas mensuales de todos los clientes?")) {
-    clienteService.resetearVisitas()
-      .then(() => {
-        setMensaje('Visitas reseteadas correctamente');
-        setTipoMensaje('exito');
-        cargarClientes();
-      })
-      .catch(() => {
-        setMensaje('Error al resetear visitas');
-        setTipoMensaje('error');
-      });
-  }
-};
 
+  // Función para resetear visitas
+  const resetearVisitas = () => {
+    if (window.confirm("¿Seguro que deseas resetear las visitas mensuales de todos los clientes?")) {
+      clienteService.resetearVisitas()
+        .then(() => {
+          setMensaje('Visitas reseteadas correctamente');
+          setTipoMensaje('exito');
+          cargarClientes();
+        })
+        .catch((error) => {
+          console.error('Error al resetear visitas:', error);
+          setMensaje('Error al resetear visitas');
+          setTipoMensaje('error');
+        });
+    }
+  };
 
   return (
     <div style={{ fontFamily: 'Arial, sans-serif' }}>
@@ -139,7 +231,7 @@ const resetearVisitas = () => {
         <h2 style={{ marginTop: '0px' }}>Arriendo de Karting</h2>
       </header>
 
-     {/* Menú lateral */}
+      {/* Menú lateral */}
       {mostrarMenu && (
         <aside style={{
           position: 'fixed',
@@ -264,7 +356,6 @@ const resetearVisitas = () => {
               >
                 Tarifas
               </button>
-            
             </li>
           </ul>
         </aside>
@@ -299,7 +390,6 @@ const resetearVisitas = () => {
             Limpiar
           </button>
         </div>
-        
 
         {/* Mensaje dinámico */}
         {mensaje && (
@@ -310,12 +400,13 @@ const resetearVisitas = () => {
             {mensaje}
           </p>
         )}
+        
         <button
-        onClick={resetearVisitas}
-        style={{ padding: '8px 12px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', marginLeft: '10px' }}
-      >
-        Resetear Visitas Mensuales
-      </button>
+          onClick={resetearVisitas}
+          style={{ padding: '8px 12px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '4px', marginLeft: '10px' }}
+        >
+          Resetear Visitas Mensuales
+        </button>
 
         {/* Formulario agregar cliente */}
         <form onSubmit={crearCliente} style={{ marginBottom: '20px' }}>
@@ -330,8 +421,15 @@ const resetearVisitas = () => {
                 value={nuevoCliente.rut}
                 onChange={handleChange}
                 required
-                style={{ padding: '6px', width: '140px' }}
+                style={{ 
+                  padding: '6px', 
+                  width: '140px',
+                  borderColor: nuevoCliente.rut && !esRutValido(nuevoCliente.rut) ? 'red' : 'initial'
+                }}
               />
+              {nuevoCliente.rut && !esRutValido(nuevoCliente.rut) && (
+                <small style={{ color: 'red' }}>RUT inválido</small>
+              )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column' }}>
               <label>Nombre</label>
@@ -368,7 +466,20 @@ const resetearVisitas = () => {
               />
             </div>
             <div style={{ display: 'flex', alignItems: 'end' }}>
-              <button type="submit" style={{ padding: '8px 16px' }}>Crear</button>
+              <button 
+                type="submit" 
+                style={{ 
+                  padding: '8px 16px',
+                  backgroundColor: esRutValido(nuevoCliente.rut) ? '#007bff' : '#ccc',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: esRutValido(nuevoCliente.rut) ? 'pointer' : 'not-allowed'
+                }}
+                disabled={!esRutValido(nuevoCliente.rut)}
+              >
+                Crear
+              </button>
             </div>
           </div>
         </form>
@@ -399,7 +510,19 @@ const resetearVisitas = () => {
                   <td>{cli.fechaCumple}</td>
                   <td>{cli.descuentoAplicable}%</td>
                   <td>
-                    <button onClick={() => eliminarCliente(cli.rut)}>Eliminar</button>
+                    <button 
+                      onClick={() => eliminarCliente(cli.rut)}
+                      style={{
+                        backgroundColor: '#dc3545',
+                        color: 'white',
+                        border: 'none',
+                        padding: '6px 12px',
+                        borderRadius: '4px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Eliminar
+                    </button>
                   </td>
                 </tr>
               ))

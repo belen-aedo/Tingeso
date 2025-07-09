@@ -13,8 +13,6 @@ import java.util.Optional;
 public interface ReporteRepository extends JpaRepository<ReporteEntity, Long> {
     List<ReporteEntity> findByTipoReporte(String tipoReporte);
 
-    List<ReporteEntity> findByFecha(LocalDate fecha);
-
     List<ReporteEntity> findByTipoReporteAndFecha(String tipoReporte, LocalDate fecha);
 
     @Query("SELECT r FROM ReporteEntity r WHERE MONTH(r.fecha) = :mes AND YEAR(r.fecha) = :anio")
@@ -29,5 +27,9 @@ public interface ReporteRepository extends JpaRepository<ReporteEntity, Long> {
     @Query("SELECT r FROM ReporteEntity r WHERE r.tipoReporte = 'PorPersonas' AND r.minPersonas <= :personas AND r.maxPersonas >= :personas AND r.fecha = :fecha")
     List<ReporteEntity> findReportesPorRangoPersonasYFecha(int personas, LocalDate fecha);
 
-    Object findByMesGenerado(LocalDate mes);
+    // En ReporteRepository.java
+    Optional<ReporteEntity> findByMesGenerado(LocalDate mes);
+
+    // En ReporteRepository.java
+    Optional<ReporteEntity> findByFecha(LocalDate fecha);
 }

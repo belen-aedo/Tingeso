@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import jakarta.persistence.*;
+import lombok.Setter;
 
 import java.time.LocalDate;
 
@@ -34,10 +35,7 @@ public class ReporteEntity {
 
     // Descripción opcional para identificar mejor el reporte
     private String descripcion;
+    @Setter
     private LocalDate mesGenerado;
-
-    public void setMesGenerado(LocalDate mesGenerado) {
-        this.mesGenerado = mesGenerado;
-    }
 
 }
